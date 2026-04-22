@@ -15,8 +15,21 @@ GREEN_PROXY = "EA.BK"
 # --- CSS Custom Styling ---
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    /* ปรับพื้นหลังให้โปร่งแสงเพื่อให้เห็นตัวหนังสือชัดทุกโหมด */
+    [data-testid="stMetric"] {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid rgba(128, 128, 128, 0.2);
+    }
+    /* กำหนดสีตัวเลขให้เด่นขึ้น (เช่น สีเขียวอ่อนแบบ Matrix) */
+    [data-testid="stMetricValue"] > div {
+        color: #2ECC71 !important;
+    }
+    /* กำหนดสีหัวข้อ Metric */
+    [data-testid="stMetricLabel"] > div > p {
+        color: #BDC3C7 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
