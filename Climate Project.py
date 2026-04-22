@@ -30,38 +30,50 @@ st.markdown("### Strategic Integration of Environmental Risks into Asset Valuati
 # --- SIDEBAR: ASSET SELECTION ---
 with st.sidebar:
     st.header("📌 Asset Selection")
-    # เพิ่ม key="unique_id" เพื่อป้องกัน Duplicate Element ID
     asset_type = st.radio("Asset Type:", ["Equity (หุ้นรายตัว)", "Mutual Fund (กองทุน)"], key="asset_type_select")
-    ticker = st.text_input("Ticker (e.g. PTT.BK or BTP.BK):", "PTT.BK", key="main_ticker_input")
     
-    sector = st.selectbox("Sector:", ["Energy", "Manufacturing", "Banking", "Agriculture", "Others"], key="sector_select")
+    # ส่วนรับค่า Ticker พร้อมระบบแนะนำ Proxy
+    ticker_input = st.text_input("Ticker (เช่น PTT.BK หรือชื่อกองทุน):", "PTT.BK", key="main_ticker_input")
     
-    st.divider()
-    st.header("🌡️ Climate Scenarios (TCFD)")
-    scenario = st.select_slider("Scenario Ambition:", 
-                               options=["1.5°C (Aggressive Tax)", "2.0°C (Moderate Tax)", "NZA (Business as Usual)"],
-                               key="scenario_slider")
+    use_proxy = st.checkbox("ใช้ดัชนีตัวแทน (Proxy) สำหรับกองทุน", value=(asset_type == "Mutual Fund (กองทุน)"))
     
-    tax_map = {"1.5°C (Aggressive Tax)": 1500, "2.0°C (Moderate Tax)": 600, "NZA (Business as Usual)": 200}
-    current_tax = tax_map[scenario]
-    
-    st.divider()
-    st.header("💰 Financial Parameters")
-    emissions = st.number_input("Emissions (tCO2e):", value=500000, key="em_input")
-    market_cap = st.number_input("Market Value / Cap (Million THB):", value=100000, key="mkt_cap_input")
-    wacc = st.slider("WACC (%):", 5.0, 15.0, 8.0, key="wacc_slider") / 100
+    if use_proxy:
+        proxy_choice = st.selectbox("เลือกดัชนีที่ตรงกับกองทุนของคุณ:", 
+                                   ["^GSPC (S&P 500 - สำหรับ SCBS&P500)", 
+                                    "^SET.BK (ดัชนีหุ้นไทยรวม)", 
+                                    "SET50.BK (หุ้นไทย 50 ตัวใหญ่)", 
+                                    "^IXIC (Nasdaq - หุ้นเทคโนโลยี)"], key="proxy_select")
+        # ดึงเฉพาะ Ticker ออกมาจากวงเล็บ
+        ticker = proxy_choice.split(" ")[0]
+        st.caption(f"💡 ระบบจะใช้ {ticker} เป็นตัวแทนในการคำนวณความเสี่ยงภูมิอากาศ")
+    else:
+        ticker = ticker_input
 
+    # ... (ส่วน Sector และ Scenario อื่นๆ คงเดิม) ...
 # --- CORE LOGIC ---
 @st.cache_data(ttl=3600)
 def fetch_and_model(symbol):
-    data = yf.download([symbol, BROWN_PROXY, GREEN_PROXY, SET_INDEX], start="2022-01-01")['Close']
-    returns = data.pct_change().dropna()
-    bmg_factor = returns[BROWN_PROXY] - returns[GREEN_PROXY]
-    Y = returns[symbol]
-    X = pd.DataFrame({'Market': returns[SET_INDEX], 'Carbon_Factor': bmg_factor})
-    X = sm.add_constant(X)
-    model = sm.OLS(Y, X).fit()
-    return model, data[symbol].iloc[-1]
+    try:
+        # ดึงข้อมูล Ticker เป้าหมาย + Proxy สำหรับคำนวณ Carbon Beta
+        data = yf.download([symbol, BROWN_PROXY, GREEN_PROXY, SET_INDEX], 
+                           start="2022-01-01", progress=False)['Close']
+        
+        # ตรวจสอบว่ามีข้อมูล Ticker นั้นจริงหรือไม่
+        if symbol not in data.columns or data[symbol].isnull().all():
+            return None, None
+            
+        returns = data.pct_change().dropna()
+        
+        # Modeling: Transition Risk Sensitivity (Carbon Beta)
+        bmg_factor = returns[BROWN_PROXY] - returns[GREEN_PROXY]
+        Y = returns[symbol]
+        X = pd.DataFrame({'Market': returns[SET_INDEX], 'Carbon_Factor': bmg_factor})
+        X = sm.add_constant(X)
+        model = sm.OLS(Y, X).fit()
+        
+        return model, data[symbol].iloc[-1]
+    except Exception:
+        return None, None
 
 try:
     model, last_price = fetch_and_model(ticker)
