@@ -33,6 +33,28 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- SIDEBAR: ASSET SELECTION ---
+with st.sidebar:
+    st.header("📌 Asset Selection")
+    # เพิ่มตัวเลือกประเภทสินทรัพย์
+    asset_type = st.radio("Asset Type:", ["Equity (หุ้นรายตัว)", "Mutual Fund (กองทุน)"])
+    ticker = st.text_input("Ticker (e.g. PTT.BK or BTP.BK):", "PTT.BK")
+    
+    # ถ้าเป็นกองทุน ให้เปลี่ยนคำอธิบาย Emissions
+    if asset_type == "Mutual Fund (กองทุน)":
+        emissions_label = "Portfolio Weighted Average Emissions (tCO2e):"
+        emissions_default = 100000
+        st.caption("💡 สำหรับกองทุน: ใช้ค่าเฉลี่ยการปล่อยก๊าซของหุ้นทุกตัวในพอร์ตรวมกัน")
+    else:
+        emissions_label = "Corporate Scope 1+2 Emissions (tCO2e):"
+        emissions_default = 500000
+    
+    sector = st.selectbox("Sector:", ["Energy", "Manufacturing", "Banking", "Agriculture", "Others"])
+    
+    st.divider()
+    # ... (โค้ด Scenario และ Financial Parameters เดิม) ...
+    emissions = st.number_input(emissions_label, value=emissions_default)
+
 # --- HEADER ---
 st.title("📊 Climate Risk Modeling & Sustainable Finance Dashboard")
 st.markdown("### Strategic Integration of Environmental Risks into Asset Valuation")
