@@ -28,7 +28,7 @@ st.markdown("""
 # --- SIDEBAR: ASSET & RISK PARAMETERS ---
 with st.sidebar:
     st.title("🛡️ Risk Control")
-    asset_type = st.radio("Asset Class", ["Equity", "Mutual Fund"], horizontal=True)
+    asset_type = st.radio("Asset Class", ["Stock", "Mutual Fund"], horizontal=True)
     ticker_input = st.text_input("Symbol Ticker", "PTT.BK")
     
     st.divider()
