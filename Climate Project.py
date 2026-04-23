@@ -9,32 +9,44 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: RETURN GREEN TABS & MODERN UI ---
+# --- CSS: MODERN UI & FIXED GREEN TABS ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
     
-    /* 🟢 คืนค่า Tab สีเขียว (Intelligence Center) */
+    /* 🟢 แถบสีเขียวสำหรับ Tab ที่เลือก (Intelligence Center) */
     .stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 10px; }
     .stTabs [data-baseweb="tab"] { 
         background-color: rgba(255, 255, 255, 0.05); 
-        border-radius: 4px; padding: 10px 20px; color: #8b949e; border: none;
+        border-radius: 4px; padding: 10px 25px; color: #8b949e; border: none;
     }
     .stTabs [aria-selected="true"] { 
-        background-color: #2ea043 !important; /* สีเขียว */
+        background-color: #2ea043 !important; 
         color: white !important; font-weight: bold;
     }
 
-    /* อื่นๆ */
+    /* สไตล์ Metrics และ Cards */
     div[data-testid="stMetric"] {
         background: rgba(255, 255, 255, 0.03) !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
         border-radius: 12px; padding: 15px;
     }
+    .insight-card {
+        background: rgba(0, 255, 136, 0.05); border-left: 4px solid #00ff88;
+        padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem;
+    }
+    .risk-card {
+        background: rgba(255, 75, 75, 0.05); border-left: 4px solid #ff4b4b;
+        padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem;
+    }
+
+    /* ตารางสถิติแบบ Yahoo Finance */
     .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
     .stats-table td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
     .stats-label { color: #8b949e; }
     .stats-value { text-align: right; font-weight: bold; color: #ffffff; }
+
+    /* Footer */
     .footer {
         position: fixed; left: 0; bottom: 0; width: 100%;
         background-color: rgba(13, 17, 23, 0.95); color: #8b949e;
@@ -45,23 +57,26 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR: PRESERVED ---
+# --- SIDEBAR: ALL FEATURES PRESERVED ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
-    st.header("🔍 ระบุชื่อหุ้นหรือกองทุน (Stock or Bond)")
-    t1 = st.text_input("Asset 1", "PTT.BK")
-    t2 = st.text_input("Asset 2", "EA.BK")
-    t3 = st.text_input("Asset 3", "TPIPP.BK")
-    tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
-
-    st.divider()
-    st.header("🌍 Scenario & Policy (TCFD)")
-    scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
-    tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
-    tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
+    with st.expander("🔍 ระบุชื่อหุ้นหรือกองทุน (Stock or Bond)", expanded=True):
+        t1 = st.text_input("Asset 1", "PTT.BK")
+        t2 = st.text_input("Asset 2", "EA.BK")
+        t3 = st.text_input("Asset 3", "TPIPP.BK")
     
-    flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
-    wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
+    st.divider()
+    with st.expander("🌍 Scenario & Policy (TCFD)", expanded=True):
+        scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
+        tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
+        tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
+    
+    st.divider()
+    with st.expander("⚙️ Advanced Parameters", expanded=True):
+        flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
+        wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
+
+    tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
 # --- DATA ENGINE ---
 @st.cache_data(ttl=600)
@@ -71,11 +86,13 @@ def fetch_pro_data(ticker_list):
         proxies = yf.download(["PTTEP.BK", "EA.BK", "^SET.BK"], period="3y", progress=False)['Close']
         proxies = proxies.ffill().bfill()
     except: proxies = pd.DataFrame()
+
     for symbol in ticker_list:
         try:
             t_obj = yf.Ticker(symbol)
             hist = t_obj.history(period="3y")['Close']
             if hist.empty: continue
+            
             c_beta = 0.0
             if not proxies.empty:
                 try:
@@ -85,7 +102,14 @@ def fetch_pro_data(ticker_list):
                     model = sm.OLS(temp_df[symbol], X).fit()
                     c_beta = model.params.get('Carbon', 0.0)
                 except: pass
-            full_res[symbol] = {"price": float(hist.iloc[-1]), "history": hist, "c_beta": c_beta, "info": t_obj.info, "news": t_obj.news[:3]}
+
+            full_res[symbol] = {
+                "price": float(hist.iloc[-1]),
+                "history": hist,
+                "c_beta": c_beta,
+                "info": t_obj.info if t_obj.info else {},
+                "news": t_obj.news[:3] if t_obj.news else []
+            }
         except: continue
     return full_res
 
@@ -95,14 +119,16 @@ st.title("🏛️ SUSTAINABLE FINANCE ASSET TERMINAL")
 if tickers:
     analysis = fetch_pro_data(tickers)
     if analysis:
+        # Overview Cards
         cols = st.columns(len(analysis))
         for i, (symbol, d) in enumerate(analysis.items()):
             cols[i].metric(f"💎 {symbol}", f"{d['price']:,.2f}", delta=f"C-Beta: {d['c_beta']:.3f}")
 
+        # Analysis Tabs (Intelligence Center)
         tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
-                # --- MARKET STATISTICS (Yahoo Finance Style) ---
+                # 📊 ตารางสถิติแบบ Yahoo Finance
                 st.subheader(f"📊 Market Summary: {symbol}")
                 inf = d['info']
                 s1, s2 = st.columns(2)
@@ -126,16 +152,18 @@ if tickers:
                     </table>""", unsafe_allow_html=True)
 
                 st.divider()
+
+                # กราฟ Gauge และ Waterfall
                 c1, c2 = st.columns(2)
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
                     risk_score = d['c_beta'] * 100 * tax_multiplier
                     fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = risk_score,
-                        gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "white"},
+                        gauge = {'axis': {'range': [-50, 50], 'tickcolor': "white"}, 'bar': {'color': "white"},
                         'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
                     fig_gauge.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
-                    st.info(f"Insight: {symbol} มีความเสี่ยง C-Beta ที่ปรับตาม Scenario เท่ากับ {risk_score:.2f}")
+                    st.markdown(f'<div class="risk-card"><b>Insight:</b> ความเสี่ยง C-Beta ที่ปรับตาม Scenario คือ <b>{risk_score:.2f}</b></div>', unsafe_allow_html=True)
 
                 with c2:
                     st.subheader("💰 Equity Value Bridge (MB)")
@@ -147,11 +175,23 @@ if tickers:
                         increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
                     fig_water.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
-                    st.warning(f"Insight: มูลค่ากิจการอาจได้รับผลกระทบ {val_impact:,.2f} MB จากนโยบายคาร์บอน")
+                    st.markdown(f'<div class="insight-card"><b>Insight:</b> มูลค่ากิจการอาจถูกปรับลด <b>-{val_impact:,.2f} MB</b></div>', unsafe_allow_html=True)
 
                 st.divider()
-                st.subheader("📈 Price Momentum")
-                st.line_chart(d['history'], height=250)
+                
+                # กราฟ Momentum และ ข่าว (Insights)
+                m1, m2 = st.columns([1.5, 1])
+                with m1:
+                    st.subheader("📈 Price Momentum")
+                    st.line_chart(d['history'], height=250)
+                with m2:
+                    st.subheader("📰 Combined Insights")
+                    # ดึงข่าวสารกลับมาแสดงผลแบบเสถียร
+                    if d['news']:
+                        for n in d['news']:
+                            st.write(f"**{n.get('publisher','Source')}**: {n.get('title','Latest Update')}")
+                            st.divider()
+                    else: st.info(f"No recent news for {symbol}. Beta is {d['c_beta']:.4f}")
 
 # --- FOOTER ---
 st.markdown(f"""<div class="footer">🏛️ Sustainable Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>""", unsafe_allow_html=True)
