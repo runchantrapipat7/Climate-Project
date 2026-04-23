@@ -147,7 +147,7 @@ def fetch_pro_data(ticker_list):
     return full_res
 
 # --- MAIN DISPLAY ---
-st.title("🏛️ CLIMATE RISK MODELING AND SUSTAINABLE FINANCE ")
+st.title("🏛️ CLIMATE RISK MODELING AND SUSTAINABLE FINANCE 🏛️")
 
 if not tickers:
     st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้น")
