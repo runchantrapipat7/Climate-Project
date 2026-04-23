@@ -118,12 +118,17 @@ if model:
         st.subheader("📰 Daily Market Intelligence")
         if news_data:
             for n in news_data:
-                st.write(f"**[{n['publisher']}]** - {n['title']}")
-                st.write(f"[อ่านข่าวเต็ม]({n['link']})")
-                st.caption("Climate Sentiment: ESG Integrated Analysis")
+                # แก้ไขการดึงข้อมูลโดยใช้ .get() เพื่อป้องกัน KeyError
+                title = n.get('title', 'No Title Available')
+                publisher = n.get('publisher', 'Unknown Source')
+                link = n.get('link', '#')
+                
+                st.write(f"**[{publisher}]** - {title}")
+                st.write(f"[อ่านข่าวเต็ม]({link})")
+                st.caption("Climate Sentiment Analysis: ESG Integrated")
                 st.divider()
         else:
-            st.warning("⚠️ ไม่พบข่าวสารล่าสุดในระบบ Ticker ของ Yahoo Finance")
+            st.warning("⚠️ ไม่พบข้อมูลข่าวสารล่าสุดในระบบ Ticker ของ Yahoo Finance")
 
 else:
     st.error(f"❌ ไม่พบข้อมูลสำหรับ Ticker: {ticker_input}")
