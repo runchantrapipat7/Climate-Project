@@ -115,4 +115,38 @@ if res:
         val_impact = (tax_price * 1000) / wacc / 1e6 # Simulation
         memo = f"""
         **วิเคราะห์พื้นฐานรายวัน:**
-        บริษัท {info.get('longName', ticker_input)} ดำเนินธุรกิจในกลุ่ม {info.get('sector', 'N/A')}
+        บริษัท {info.get('longName', ticker_input)} ดำเนินธุรกิจในกลุ่ม {info.get('sector', 'N/A')} 
+        ปัจจุบันมีค่า Carbon Beta ที่ **{c_beta:.3f}** ซึ่งสะท้อนความเสี่ยง {('สูง' if c_beta > 0 else 'ต่ำ')} ต่อการเปลี่ยนผ่านนโยบายคาร์บอน
+        
+        **Climate Valuation Impact:**
+        - ภายใต้ฉากทัศน์ **{scenario}** ที่ราคาภาษี {tax_price} บาท/ตัน
+        - คาดการณ์มูลค่ากิจการที่ลดลง (Climate Discount): **-{val_impact:,.2f} Million THB**
+        - ความเสี่ยงกายภาพ: **{flood_risk}% Flood Exposure** อิงจากข้อมูลความเสี่ยงลุ่มแม่น้ำเจ้าพระยา
+        """
+        st.info(memo)
+        
+        # Waterfall Chart
+        fig_water = go.Figure(go.Waterfall(
+            x = ["Market Cap", "Climate Loss", "Fair Value"],
+            y = [info.get('marketCap', 1e9)/1e6, -val_impact, (info.get('marketCap', 1e9)/1e6) - val_impact],
+            measure = ["relative", "relative", "total"]
+        ))
+        fig_water.update_layout(title="Equity Value Bridge (Million THB)")
+        st.plotly_chart(fig_water, use_container_width=True)
+
+    with res_r:
+        st.subheader("📰 Daily Market Intelligence & ESG News")
+        if res['news']:
+            for n in res['news']:
+                title = n.get('title', 'N/A')
+                pub = n.get('publisher', 'Unknown')
+                link = n.get('link', '#')
+                st.write(f"**[{pub}]** - {title}")
+                st.write(f"[อ่านต่อ]({link})")
+                st.divider()
+        else:
+            st.warning("ไม่มีข้อมูลข่าวสารล่าสุดในระบบสำหรับหุ้นตัวนี้")
+
+else:
+    st.error(f"❌ ไม่พบข้อมูลสำหรับ Ticker: {ticker_input}")
+    st.info("💡 กรุณาตรวจสอบว่าชื่อหุ้นถูกต้องและลงท้ายด้วย .BK (เช่น PTT.BK)")
