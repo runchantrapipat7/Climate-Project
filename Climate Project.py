@@ -32,14 +32,14 @@ st.markdown("""
 with st.sidebar:
     st.title("⚖️ Portfolio Intelligence")
     t1 = st.text_input("Asset 1", "PTT.BK")
-    t2 = st.text_input("Asset 2", "EA.BK")
+    t2 = st.text_input("Asset 2", "BTS.BK")
     t3 = st.text_input("Asset 3", "")
     tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
     st.divider()
     st.header("🌍 Scenario & Policy")
     scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
-    tax_price = tax_map = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
+    tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
     
     flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
     wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
@@ -51,7 +51,7 @@ def fetch_analysis_data(ticker_list):
         all_fetch = ticker_list + ["PTTEP.BK", "EA.BK", "^SET.BK"]
         data = yf.download(all_fetch, period="5y", interval="1d", progress=False)['Close']
         if isinstance(data, pd.Series): data = data.to_frame()
-        data = data.ffill().bfill() # แก้ไขข้อมูลหาย
+        data = data.ffill().bfill() 
 
         full_res = {}
         for symbol in ticker_list:
@@ -59,7 +59,6 @@ def fetch_analysis_data(ticker_list):
                 stock_history = data[symbol].dropna()
                 if stock_history.empty: continue
                 
-                # Modeling Transition Risk
                 try:
                     mkt_data = data[["PTTEP.BK", "EA.BK", "^SET.BK"]].dropna()
                     combined = pd.concat([stock_history, mkt_data], axis=1).pct_change().dropna()
@@ -89,7 +88,7 @@ if tickers:
     analysis, history = fetch_analysis_data(tickers)
     
     if analysis:
-        # Overview
+        # Overview Cards
         cols = st.columns(len(analysis))
         for i, (symbol, d) in enumerate(analysis.items()):
             cols[i].metric(f"💎 {symbol}", f"{d['last_price']:,.2f}", delta=f"C-Beta: {d['carbon_beta']:.3f}")
@@ -123,15 +122,17 @@ if tickers:
                 r_l, r_r = st.columns(2)
                 with r_l:
                     st.subheader("💰 Equity Value Bridge (MB)")
-                    # ปรับปรุง Logic การคำนวณเพื่อป้องกัน ValueError (จุดที่แก้ไข)
+                    # FIXED LOGIC: ป้องกัน ValueError
                     mkt_cap_raw = d['info'].get('marketCap')
                     mkt_cap_mb = float(mkt_cap_raw)/1e6 if mkt_cap_raw else 1000.0
                     val_impact = (tax_price * 1000) / wacc / 1e6
                     
                     st.info(f"**Research:** {symbol} เสี่ยงอุทกภัย {flood_risk}% | ผลกระทบมูลค่า: -{val_impact:,.2f}M")
                     
+                    # จุดที่แก้ไข: เพิ่มตัวแปร 'y' และจัดการค่าคงที่
                     fig_water = go.Figure(go.Waterfall(
-                        orientation = "v", x = ["Current Cap", "Climate Loss", "Adjusted Value"],
+                        orientation = "v",
+                        x = ["Current Cap", "Climate Loss", "Adjusted Value"],
                         y = [mkt_cap_mb, -val_impact, mkt_cap_mb - val_impact],
                         measure = ["relative", "relative", "total"],
                         decreasing = {"marker":{"color":"#E74C3C"}},
