@@ -10,7 +10,7 @@ import time
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE DARK TERMINAL UI (คงเดิมทุกประการ) ---
+# --- CSS: ULTIMATE DARK TERMINAL UI (คงเดิม 100%) ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -70,10 +70,10 @@ with st.sidebar:
     stocks_html = "".join([f'<div class="top-pick-item"><span>{s["symbol"]}</span><span style="color:#8b949e; font-size:0.7rem;">Active Vol.</span></div>' for s in top_stocks])
     st.markdown(f'<div class="top-pick-container"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p>{stocks_html}</div>', unsafe_allow_html=True)
 
-    with st.expander("🔍 Stock Selection", expanded=True):
-        t1 = st.text_input("Stock 1", "PTT.BK")
-        t2 = st.text_input("Stock 2", "EA.BK")
-        t3 = st.text_input("Stock 3", "")
+    with st.expander("🔍 Asset Selection", expanded=True):
+        t1 = st.text_input("Asset 1", "PTT.BK")
+        t2 = st.text_input("Asset 2", "EA.BK")
+        t3 = st.text_input("Asset 3", "")
     
     st.divider()
     with st.expander("🌍 Scenario Policy (TCFD)", expanded=True):
@@ -92,8 +92,6 @@ with st.sidebar:
 @st.cache_data(ttl=600)
 def fetch_pro_data(ticker_list):
     full_res = {}
-    
-    # 1. โหลด Benchmark (ถ้าไม่ได้ไม่เป็นไร แค่ไม่มี Beta)
     proxies = pd.DataFrame()
     try:
         proxies = yf.download(["PTTEP.BK", "EA.BK", "^SET.BK"], period="1y", progress=False)['Close'].ffill()
@@ -102,27 +100,38 @@ def fetch_pro_data(ticker_list):
     for symbol in ticker_list:
         try:
             t_obj = yf.Ticker(symbol)
-            
-            # 2. โหลดราคา (ต้องได้! ถ้าไม่ได้ตัวนี้จะถูกข้าม)
             hist = t_obj.history(period="1y")['Close'].ffill()
             if hist.empty: continue
             
-            # 3. โหลด Info (ใส่ Try แยก เพื่อไม่ให้ Info พังแล้วอย่างอื่นพังตาม)
+            # --- แก้ไขจุด N/A: รวมร่างข้อมูลจากหลายแหล่ง ---
             info = {}
             try:
-                info = t_obj.info
-                if not info or 'regularMarketPrice' not in info: # บางครั้ง info มาเป็น None
-                    info = {"shortName": symbol}
+                # 1. ลองดึง Info พื้นฐาน
+                info = t_obj.info if t_obj.info else {}
+                
+                # 2. ใช้ Fast Info มาเติม (เสถียรกว่าสำหรับ Market Cap / Price)
+                fast = t_obj.fast_info
+                if fast:
+                    info['marketCap'] = info.get('marketCap') or fast.get('market_cap')
+                    info['lastPrice'] = fast.get('last_price')
+                    
+                # 3. ถ้า PE หรือ Debt ยังว่าง ลองหาจาก Financials (เผื่อ Yahoo ไม่ส่งมาใน info)
+                if not info.get('trailingPE'):
+                    try:
+                        # คำนวณ PE แบบหยาบจากราคา/กำไรต่อหุ้น
+                        eps = info.get('trailingEps')
+                        if eps and eps > 0:
+                            info['trailingPE'] = float(hist.iloc[-1]) / eps
+                    except: pass
             except:
                 info = {"shortName": symbol}
 
-            # 4. โหลด News (ใส่ Try แยก)
+            # ดึง News
             news = []
-            try:
-                news = t_obj.news[:3]
+            try: news = t_obj.news[:3]
             except: pass
 
-            # 5. คำนวณ Beta
+            # คำนวณ Beta
             c_beta = 0.0
             if not proxies.empty:
                 try:
@@ -140,14 +149,11 @@ def fetch_pro_data(ticker_list):
                 "info": info,
                 "news": news
             }
-        except Exception as e:
-            st.error(f"⚠️ Error loading {symbol}: {e}")
-            continue
-            
+        except: continue
     return full_res
 
 # --- MAIN DISPLAY ---
-st.title("🏛️ CLIMATE RISK MODELING AND SUSTAINABLE FINANCE 🏛️")
+st.title("🏛️ SUSTAINABLE FINANCE ASSET TERMINAL")
 
 if not tickers:
     st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้น")
@@ -155,7 +161,7 @@ else:
     analysis = fetch_pro_data(tickers)
     
     if not analysis:
-        st.warning("❌ ไม่สามารถดึงข้อมูลหุ้นได้ โปรดตรวจสอบชื่อ Ticker (เช่น PTT.BK) หรือรีเฟรชหน้าเว็บ")
+        st.warning("❌ ไม่สามารถดึงข้อมูลหุ้นได้ โปรดตรวจสอบชื่อ Ticker")
     else:
         # Overview Cards
         cols = st.columns(len(analysis))
@@ -166,11 +172,11 @@ else:
         tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
-                # 1. กราฟราคา (ต้องขึ้น)
+                # 1. กราฟราคา
                 st.subheader(f"📈 Price Performance: {symbol}")
                 st.line_chart(d['history'], color="#00ff88")
 
-                # 2. Market Summary
+                # 2. Market Summary (ปรับจูนการดึงค่า)
                 st.subheader(f"📊 Market Summary: {symbol}")
                 inf = d.get('info', {})
                 s1, s2 = st.columns(2)
@@ -178,7 +184,7 @@ else:
                 def get_val(key, style="{:,.2f}", mult=1):
                     v = inf.get(key)
                     if v is None or v == 0: return "N/A"
-                    try: return style.format(v * mult)
+                    try: return style.format(float(v) * mult)
                     except: return str(v)
 
                 with s1:
@@ -189,7 +195,10 @@ else:
                 st.divider()
                 # 3. Risk Matrix
                 st.subheader("🛡️ Comprehensive Climate Risk Matrix")
-                de_ratio = inf.get('debtToEquity', 100) or 100
+                # Fallback สำหรับค่า Debt/Equity ถ้าหาไม่เจอจริงๆ
+                de_raw = inf.get('debtToEquity')
+                de_ratio = float(de_raw) if de_raw and de_raw != 'N/A' else 100.0
+                
                 dynamic_trans = d['c_beta'] * 100 * tax_multiplier
                 credit_risk = "High" if (de_ratio > 150 or abs(dynamic_trans) > 25) else "Low"
                 op_risk = "High" if flood_risk > 60 else "Low"
@@ -213,7 +222,8 @@ else:
                 
                 with c2:
                     st.subheader("💰 Equity Value Bridge (MB)")
-                    mkt_cap_mb = float(inf.get('marketCap', 1e11))/1e6
+                    raw_cap = inf.get('marketCap')
+                    mkt_cap_mb = float(raw_cap)/1e6 if raw_cap and raw_cap != 0 else 1e5
                     val_impact = (tax_price * 1000) / wacc / 1e6
                     adj_val = mkt_cap_mb - val_impact
                     fig_water = go.Figure(go.Waterfall(orientation = "v", measure = ["relative", "relative", "total"],
@@ -224,7 +234,7 @@ else:
                     st.plotly_chart(fig_water, use_container_width=True, key=f"water_{symbol}")
 
                 st.divider()
-                # 5. News Feed
+                # 5. News Feed (ของเดิมอยู่ครบ)
                 st.subheader(f"📰 Intelligence Feed: {symbol}")
                 if d['news']:
                     for n in d['news']:
@@ -237,4 +247,4 @@ else:
                     st.markdown(f'<div class="log-terminal"><div class="log-entry">[{datetime.now().strftime("%H:%M:%S")}] > SUCCESS: Data synchronized.</div></div>', unsafe_allow_html=True)
 
 # --- FOOTER ---
-st.markdown(f'<div class="footer">🏛️ Climate Risk Modeling and Sustainable Finance | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer">🏛️ Sustainable Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
