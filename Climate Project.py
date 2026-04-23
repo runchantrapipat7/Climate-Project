@@ -9,47 +9,87 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Intelligence Pro", layout="wide")
 
-# --- CSS: ULTIMATE DARK MODE & GLASSMORPHISM ---
+# --- CSS: ULTIMATE DARK MODE & SIDEBAR STYLING ---
 st.markdown("""
     <style>
+    /* Main Background */
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
+    
+    /* Sidebar Styling */
+    section[data-testid="stSidebar"] {
+        background-color: rgba(13, 17, 23, 0.95) !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Input Boxes Styling */
+    .stTextInput>div>div>input {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        color: #00ff88 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 10px !important;
+    }
+    
+    /* Metric & Card Styling */
     div[data-testid="stMetric"] {
         background: rgba(255, 255, 255, 0.03) !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
         border-radius: 12px; padding: 15px;
     }
+    
     .insight-card {
         background: rgba(0, 255, 136, 0.05);
         border-left: 4px solid #00ff88;
-        padding: 15px; border-radius: 8px; margin-top: 10px;
+        padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem;
     }
+    
     .risk-card {
         background: rgba(255, 75, 75, 0.05);
         border-left: 4px solid #ff4b4b;
-        padding: 15px; border-radius: 8px; margin-top: 10px;
+        padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem;
     }
-    div[data-testid="stMetricValue"] > div { color: #00ff88 !important; font-size: 24px; font-weight: 600; }
-    .stTabs [aria-selected="true"] { background: linear-gradient(90deg, #2ea043, #238636) !important; color: white !important; }
+    
+    /* Slider Color Customization */
+    .stSlider [data-baseweb="slider"] { margin-bottom: 25px; }
+    
+    /* Tabs Customization */
+    .stTabs [aria-selected="true"] { 
+        background: linear-gradient(90deg, #2ea043, #238636) !important; 
+        color: white !important; 
+        border-radius: 8px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR: ALL FEATURES PRESERVED ---
+# --- SIDEBAR: MODERN INPUT SELECTION ---
 with st.sidebar:
-    st.title("🛡️ Risk Terminal")
-    st.header("🔍 ระบุชื่อหุ้นหรือกองทุน (Stock or Bond)")
-    t1 = st.text_input("Asset 1", "PTT.BK")
-    t2 = st.text_input("Asset 2", "EA.BK")
-    t3 = st.text_input("Asset 3", "")
-    tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
-
-    st.divider()
-    st.header("🌍 Scenario & Policy (TCFD)")
-    scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
-    tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
-    tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
+    st.image("https://www.tcfdhub.org/wp-content/uploads/2021/07/tcfd_logo_header.png", width=150)
+    st.title("🛡️ Risk Controller")
     
-    flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
-    wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
+    with st.expander("🔍 Asset Selection", expanded=True):
+        st.write("กรุณาระบุหุ้นที่ต้องการวิเคราะห์")
+        t1 = st.text_input("Asset 1 (Primary)", "PTT.BK")
+        t2 = st.text_input("Asset 2", "EA.BK")
+        t3 = st.text_input("Asset 3", "")
+    
+    st.divider()
+    
+    with st.expander("🌍 Climate Scenarios", expanded=True):
+        st.write("เลือกระดับความเข้มข้นของนโยบาย")
+        scenario = st.select_slider(
+            "Ambition Level", 
+            options=["Net Zero 2050", "Delayed Transition", "Current Policy"],
+            value="Delayed Transition"
+        )
+        tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
+        tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
+    
+    st.divider()
+    
+    with st.expander("⚙️ Advanced Parameters", expanded=True):
+        flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45, help="ความเสี่ยงจากภัยน้ำท่วมในพื้นที่ตั้งโรงงาน")
+        wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0, help="อัตราคิดลดสำหรับประเมินมูลค่ากิจการ") / 100
+
+    tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
 # --- DATA ENGINE ---
 @st.cache_data(ttl=600)
@@ -92,20 +132,19 @@ st.title("🏛️ SUSTAINABLE FINANCE ASSET TERMINAL")
 if tickers:
     analysis = fetch_pro_data(tickers)
     if analysis:
-        # Comparative Overview Cards
+        # Overview Cards
         cols = st.columns(len(analysis))
         for i, (symbol, d) in enumerate(analysis.items()):
             cols[i].metric(f"💎 {symbol}", f"{d['price']:,.2f}", delta=f"C-Beta: {d['c_beta']:.3f}")
 
-        # Deep Dive Analysis Tabs
-        tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
+        # Analysis Tabs
+        tabs = st.tabs([f"Intelligence: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
                 c1, c2 = st.columns(2)
                 
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
-                    # DYNAMIC GAUGE
                     risk_score = d['c_beta'] * 100 * tax_multiplier
                     fig_gauge = go.Figure(go.Indicator(
                         mode = "gauge+number", value = risk_score,
@@ -120,16 +159,15 @@ if tickers:
                     fig_gauge.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
                     
-                    # --- SUMMARY BOX 1 ---
-                    risk_status = "High Risk" if risk_score > 20 else "Moderate" if risk_score > 0 else "Low Risk"
+                    # --- Summary Box Under Gauge ---
+                    risk_st = "High" if risk_score > 20 else "Moderate" if risk_score > 0 else "Low"
                     st.markdown(f"""<div class="risk-card">
-                        <b>Transition Insight:</b> {symbol} มีความเสี่ยงระดับ <b>{risk_status}</b> 
-                        ภายใต้เงื่อนไข {scenario}. ค่า Carbon Beta ที่ปรับปรุงแล้วคือ <b>{risk_score:.2f}</b>
+                        <b>Transition Insight:</b> ระดับความเสี่ยง <b>{risk_st}</b> 
+                        (Score: {risk_score:.2f}) ภายใต้ฉากทัศน์ {scenario}
                         </div>""", unsafe_allow_html=True)
 
                 with c2:
                     st.subheader("💰 Equity Value Bridge (MB)")
-                    # PREMIUM WATERFALL
                     m_cap = d['info'].get('marketCap', 1e11)
                     mkt_cap_mb = float(m_cap)/1e6
                     val_impact = (tax_price * 1000) / wacc / 1e6
@@ -138,7 +176,7 @@ if tickers:
                     fig_water = go.Figure(go.Waterfall(
                         orientation = "v",
                         measure = ["relative", "relative", "total"],
-                        x = ["Starting Cap", "Climate Loss", "Adj. Value"],
+                        x = ["Initial Cap", "Climate Loss", "Adj. Value"],
                         y = [mkt_cap_mb, -val_impact, adj_val],
                         text = [f"{mkt_cap_mb:,.0f}", f"-{val_impact:,.0f}", f"{adj_val:,.0f}"],
                         textposition = "outside",
@@ -149,14 +187,14 @@ if tickers:
                     fig_water.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
                     
-                    # --- SUMMARY BOX 2 ---
+                    # --- Summary Box Under Waterfall ---
                     st.markdown(f"""<div class="insight-card">
-                        <b>Valuation Insight:</b> มูลค่ากิจการอาจลดลง <b>-{val_impact:,.2f} MB</b> 
-                        หรือคิดเป็น <b>-{(val_impact/mkt_cap_mb)*100:.2f}%</b> จากผลกระทบของนโยบายคาร์บอน
+                        <b>Valuation Insight:</b> คาดการณ์มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b> 
+                        ({-(val_impact/mkt_cap_mb)*100:.2f}%) จากผลกระทบ Carbon Tax
                         </div>""", unsafe_allow_html=True)
 
                 st.divider()
-                # Bottom Section: Momentum & News (Preserved)
+                # Momentum & News
                 m1, m2 = st.columns([1.5, 1])
                 with m1:
                     st.subheader("📈 Price Momentum (3Y)")
@@ -167,4 +205,4 @@ if tickers:
                         for n in d['news']:
                             st.write(f"**{n.get('publisher','Source')}**: {n.get('title','No Title')}")
                             st.divider()
-                    else: st.info(f"No recent news. Beta is {d['c_beta']:.4f}")
+                    else: st.info("No recent news for this asset.")
