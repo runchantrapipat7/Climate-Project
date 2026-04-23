@@ -186,4 +186,4 @@ if tickers:
                             st.divider()
 
 # --- FOOTER ---
-st.markdown(f'<div class="footer">🏛️ Sustainable Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer">🏛️ Climate Risk And Sustainable Finance | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
