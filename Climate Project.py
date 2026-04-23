@@ -9,7 +9,7 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE MODERN UI & FIXED SINGLE BOX TOP PICKS ---
+# --- CSS: ULTIMATE MODERN UI & FIXED SINGLE BOX (NO ERROR) ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -29,13 +29,13 @@ st.markdown("""
         border: 1px solid #2ea043;
         border-radius: 12px;
         padding: 15px;
-        background: rgba(46, 160, 67, 0.05);
+        background: rgba(46, 160, 67, 0.08);
         box-shadow: 0 0 15px rgba(46, 160, 67, 0.15);
         margin-bottom: 25px;
     }
     .top-pick-header-box {
-        padding-bottom: 10px;
-        margin-bottom: 12px;
+        padding-bottom: 12px;
+        margin-bottom: 15px;
         text-align: center;
         border-bottom: 1px solid rgba(46, 160, 67, 0.3);
     }
@@ -48,10 +48,11 @@ st.markdown("""
     .top-pick-item {
         font-size: 0.88rem;
         font-weight: bold;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
         color: white;
         display: flex;
         justify-content: space-between;
+        align-items: center;
     }
     .active-vol-label {
         color: #8b949e;
@@ -61,9 +62,9 @@ st.markdown("""
     .top-pick-subtext {
         font-size: 0.7rem;
         color: #8b949e;
-        margin-top: 12px;
+        margin-top: 15px;
         text-align: center;
-        opacity: 0.7;
+        opacity: 0.8;
     }
 
     /* อื่นๆ */
@@ -86,7 +87,7 @@ st.markdown("""
 # --- DYNAMIC TOP PICKS ENGINE (5 STOCKS) ---
 @st.cache_data(ttl=3600)
 def get_real_top_picks_5():
-    candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCC.BK", "SCB.BK", "BDMS.BK"]
+    candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
     picks = []
     for t in candidate_tickers:
         try:
@@ -101,35 +102,25 @@ def get_real_top_picks_5():
 with st.sidebar:
     st.title("🛡️ Risk Controller")
     
-    # 💡 หุ้นเด่นวันนี้ แบบรวมในกรอบเดียวสมบูรณ์
+    # 💡 แก้ไข Error: ใช้ f-string และระมัดระวังการปิด Tag
     top_stocks = get_real_top_picks_5()
     
-    # เริ่มต้นกรอบ
-    top_picks_html = f"""
+    content_html = ""
+    if top_stocks:
+        for stock in top_stocks:
+            content_html += f'<div class="top-pick-item"><span>{stock["symbol"]}</span><span class="active-vol-label">Active Vol.</span></div>'
+    
+    # รวม HTML ทั้งหมดเข้าด้วยกัน
+    full_widget_html = f"""
     <div class="top-pick-container">
         <div class="top-pick-header-box">
             <p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p>
         </div>
-    """
-    
-    # เพิ่มรายชื่อหุ้นเข้าไปใน HTML ตัวแปรเดียว
-    if top_stocks:
-        for stock in top_stocks:
-            top_picks_html += f"""
-            <div class="top-pick-item">
-                <span>{stock['symbol']}</span>
-                <span class="active-vol-label">Active Vol.</span>
-            </div>
-            """
-    
-    # ปิดกรอบ
-    top_picks_html += """
+        {content_html}
         <div class="top-pick-subtext">อัปเดตข้อมูลจาก Yahoo Finance รายวัน</div>
     </div>
     """
-    
-    # แสดงผล HTML ก้อนเดียว
-    st.markdown(top_picks_html, unsafe_allow_html=True)
+    st.sidebar.markdown(full_widget_html, unsafe_allow_html=True)
 
     with st.expander("🔍 ระบุชื่อหุ้นหรือกองทุน (Stock or Bond)", expanded=True):
         t1 = st.text_input("Asset 1", "PTT.BK")
@@ -229,7 +220,7 @@ if tickers:
                         increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
                     fig_water.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
-                    st.markdown(f'<div class="insight-card"><b>Insight:</b> มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="insight-card"><b>Insight:</b> คาดการณ์มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b></div>', unsafe_allow_html=True)
                 st.divider()
                 m1, m2 = st.columns([1.5, 1])
                 with m1:
