@@ -9,7 +9,7 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE MODERN UI & NEON TOP PICKS ---
+# --- CSS: ULTIMATE MODERN UI & NEON TOP PICKS (SINGLE BOX) ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -24,35 +24,50 @@ st.markdown("""
         background-color: #2ea043 !important; color: white !important; font-weight: bold;
     }
 
-    /* 💡 หุ้นเด่นวันนี้ ดีไซน์ตามรูปภาพ */
-    .top-pick-header {
+    /* 💡 หุ้นเด่นวันนี้ ดีไซน์กรอบเดียว (Single Container) */
+    .top-pick-container {
         border: 1px solid #2ea043;
         border-radius: 12px;
-        padding: 10px;
-        text-align: center;
+        padding: 15px;
         background: rgba(46, 160, 67, 0.05);
-        box-shadow: 0 0 10px rgba(46, 160, 67, 0.2);
-        margin-bottom: 20px;
+        box-shadow: 0 0 15px rgba(46, 160, 67, 0.15);
+        margin-bottom: 25px;
+    }
+    .top-pick-header-box {
+        border-bottom: 1px solid rgba(46, 160, 67, 0.3);
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+        text-align: center;
     }
     .top-pick-title {
         color: #00ff88;
         font-weight: bold;
-        font-size: 1.1rem;
+        font-size: 1.05rem;
+        margin: 0;
+    }
+    .top-pick-list {
+        list-style-type: none;
+        padding: 0;
         margin: 0;
     }
     .top-pick-item {
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         font-weight: bold;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
         color: white;
+        display: flex;
+        justify-content: space-between;
     }
-    .top-pick-sub {
-        font-size: 0.75rem;
+    .top-pick-subtext {
+        font-size: 0.72rem;
         color: #8b949e;
         margin-top: 15px;
+        text-align: center;
+        border-top: 1px solid rgba(255,255,255,0.05);
+        padding-top: 10px;
     }
 
-    /* สไตล์ Metrics และ Cards */
+    /* อื่นๆ */
     div[data-testid="stMetric"] {
         background: rgba(255, 255, 255, 0.03) !important;
         border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -60,29 +75,20 @@ st.markdown("""
     }
     .insight-card { background: rgba(0, 255, 136, 0.05); border-left: 4px solid #00ff88; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem; }
     .risk-card { background: rgba(255, 75, 75, 0.05); border-left: 4px solid #ff4b4b; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem; }
-
-    /* ตารางสถิติ */
     .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
     .stats-table td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
     .stats-label { color: #8b949e; }
     .stats-value { text-align: right; font-weight: bold; color: #ffffff; }
-
-    /* Footer */
-    .footer {
-        position: fixed; left: 0; bottom: 0; width: 100%;
-        background-color: rgba(13, 17, 23, 0.95); color: #8b949e;
-        text-align: center; padding: 10px; font-size: 0.8rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999;
-    }
+    .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: rgba(13, 17, 23, 0.95); color: #8b949e; text-align: center; padding: 10px; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999; }
     .block-container { padding-bottom: 80px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- DYNAMIC TOP PICKS ENGINE ---
+# --- DYNAMIC TOP PICKS ENGINE (5 STOCKS) ---
 @st.cache_data(ttl=3600)
-def get_real_top_picks():
-    # รายชื่อหุ้นที่มีโอกาสเป็นผู้นำตลาด
-    candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK"]
+def get_real_top_picks_5():
+    # รายชื่อหุ้นผู้นำตลาด
+    candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCC.BK", "SCB.BK", "BDMS.BK"]
     picks = []
     for t in candidate_tickers:
         try:
@@ -91,38 +97,38 @@ def get_real_top_picks():
             if not data.empty:
                 picks.append({"symbol": t, "volume": data['Volume'].iloc[-1]})
         except: continue
-    # เรียงลำดับตามปริมาณการซื้อขายสูงสุด
-    return sorted(picks, key=lambda x: x['volume'], reverse=True)[:2]
+    # เลือก 5 ตัวที่ Volume สูงสุด
+    return sorted(picks, key=lambda x: x['volume'], reverse=True)[:5]
 
-# --- SIDEBAR: PRESERVED & STYLED ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
     
+    # 💡 หุ้นเด่นวันนี้ ดีไซน์กรอบเดียว 5 ตัว
+    top_stocks = get_real_top_picks_5()
+    st.markdown('<div class="top-pick-container">', unsafe_allow_html=True)
+    st.markdown('<div class="top-pick-header-box"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p></div>', unsafe_allow_html=True)
+    if top_stocks:
+        for stock in top_stocks:
+            st.markdown(f'<div class="top-pick-item"><span>{stock["symbol"]}</span><span style="color:#8b949e; font-weight:normal; font-size:0.75rem;">Active Vol.</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="top-pick-subtext">อัปเดตข้อมูลจาก Yahoo Finance รายวัน</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
     with st.expander("🔍 ระบุชื่อหุ้นหรือกองทุน (Stock or Bond)", expanded=True):
         t1 = st.text_input("Asset 1", "PTT.BK")
         t2 = st.text_input("Asset 2", "EA.BK")
         t3 = st.text_input("Asset 3", "TPIPP.BK")
     
     st.divider()
-    
     with st.expander("🌍 Scenario & Policy (TCFD)", expanded=True):
         scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
         tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
         tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
     
     st.divider()
-    
     with st.expander("⚙️ Advanced Parameters", expanded=True):
         flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
         wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
-
-    # 💡 หุ้นเด่นวันนี้ ดีไซน์ตามรูปภาพที่คุณส่งมา
-    top_stocks = get_real_top_picks()
-    st.markdown('<div class="top-pick-header"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p></div>', unsafe_allow_html=True)
-    if top_stocks:
-        for stock in top_stocks:
-            st.markdown(f'<div class="top-pick-item">{stock["symbol"]} (Active Volume)</div>', unsafe_allow_html=True)
-    st.markdown('<div class="top-pick-sub">อัปเดตข้อมูลจาก Yahoo Finance รายวัน</div>', unsafe_allow_html=True)
 
     tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
