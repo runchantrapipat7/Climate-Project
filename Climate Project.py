@@ -10,7 +10,7 @@ import time
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE DARK TERMINAL UI (คงเดิมทุกอย่าง) ---
+# --- CSS: ULTIMATE DARK TERMINAL UI (คงเดิมทุกประการ) ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -43,7 +43,7 @@ st.markdown("""
     .log-terminal { background: #000000 !important; border: 1px solid #2ea043 !important; border-radius: 8px; font-family: 'Courier New', Courier, monospace !important; padding: 15px; }
     .log-entry { color: #00ff88; font-size: 0.85rem; margin-bottom: 5px; }
     .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    .stats-table td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; color: white; }
+    .stats-table td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; color: white !important; }
     .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: rgba(13, 17, 23, 0.95); color: #8b949e; text-align: center; padding: 10px; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999; }
     .block-container { padding-bottom: 100px; }
     </style>
@@ -59,8 +59,7 @@ def get_real_top_picks_5():
         for t in candidate_tickers:
             if t in data.columns:
                 v = data[t].dropna()
-                if not v.empty:
-                    picks.append({"symbol": t, "volume": v.iloc[-1]})
+                if not v.empty: picks.append({"symbol": t, "volume": v.iloc[-1]})
     except: pass
     return sorted(picks, key=lambda x: x['volume'], reverse=True)[:5]
 
@@ -89,63 +88,75 @@ with st.sidebar:
 
     tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
-# --- DATA ENGINE (Fixed Price Loading while Keeping All Features) ---
+# --- DATA ENGINE (Maximum Reliability Version) ---
 @st.cache_data(ttl=600)
 def fetch_pro_data(ticker_list):
     full_res = {}
+    
+    # 1. โหลด Benchmark (ถ้าไม่ได้ไม่เป็นไร แค่ไม่มี Beta)
+    proxies = pd.DataFrame()
     try:
-        proxies = yf.download(["PTTEP.BK", "EA.BK", "^SET.BK"], period="2y", progress=False)['Close'].ffill()
-    except:
-        proxies = pd.DataFrame()
+        proxies = yf.download(["PTTEP.BK", "EA.BK", "^SET.BK"], period="1y", progress=False)['Close'].ffill()
+    except: pass
 
     for symbol in ticker_list:
         try:
             t_obj = yf.Ticker(symbol)
-            # ดึงข้อมูลย้อนหลัง 2 ปีเพื่อให้ครอบคลุมทั้งกราฟและ Beta
-            hist_df = t_obj.history(period="2y")
             
-            if hist_df.empty:
-                # ลองอีกครั้งด้วยช่วงข้อมูลที่สั้นลงเพื่อให้ได้ราคาปัจจุบัน
-                hist_df = t_obj.history(period="1mo")
-                
-            if not hist_df.empty:
-                hist = hist_df['Close'].ffill()
-                current_price = float(hist.iloc[-1])
-                
-                # Carbon Beta Calculation
-                c_beta = 0.0
-                if not proxies.empty:
-                    try:
-                        combined = pd.concat([hist.pct_change(), proxies.pct_change()], axis=1).dropna()
-                        combined.columns = ['target', 'pttep', 'ea', 'set']
-                        bmg = combined['pttep'] - combined['ea']
-                        X = sm.add_constant(pd.DataFrame({'Market': combined['set'], 'Carbon': bmg}))
-                        model = sm.OLS(combined['target'], X).fit()
-                        c_beta = model.params.get('Carbon', 0.0)
-                    except: pass
-                
-                # Fetch Info and News (เพื่อให้ News ไม่หาย)
-                info = t_obj.info if t_obj.info else {}
-                news = t_obj.news[:3] if t_obj.news else []
+            # 2. โหลดราคา (ต้องได้! ถ้าไม่ได้ตัวนี้จะถูกข้าม)
+            hist = t_obj.history(period="1y")['Close'].ffill()
+            if hist.empty: continue
+            
+            # 3. โหลด Info (ใส่ Try แยก เพื่อไม่ให้ Info พังแล้วอย่างอื่นพังตาม)
+            info = {}
+            try:
+                info = t_obj.info
+                if not info or 'regularMarketPrice' not in info: # บางครั้ง info มาเป็น None
+                    info = {"shortName": symbol}
+            except:
+                info = {"shortName": symbol}
 
-                full_res[symbol] = {
-                    "price": current_price,
-                    "history": hist,
-                    "c_beta": c_beta,
-                    "info": info,
-                    "news": news
-                }
-        except: continue
+            # 4. โหลด News (ใส่ Try แยก)
+            news = []
+            try:
+                news = t_obj.news[:3]
+            except: pass
+
+            # 5. คำนวณ Beta
+            c_beta = 0.0
+            if not proxies.empty:
+                try:
+                    combined = pd.concat([hist.pct_change(), proxies.pct_change()], axis=1).dropna()
+                    combined.columns = ['target', 'pttep', 'ea', 'set']
+                    bmg = combined['pttep'] - combined['ea']
+                    X = sm.add_constant(pd.DataFrame({'Market': combined['set'], 'Carbon': bmg}))
+                    c_beta = sm.OLS(combined['target'], X).fit().params.get('Carbon', 0.0)
+                except: pass
+
+            full_res[symbol] = {
+                "price": float(hist.iloc[-1]),
+                "history": hist,
+                "c_beta": c_beta,
+                "info": info,
+                "news": news
+            }
+        except Exception as e:
+            st.error(f"⚠️ Error loading {symbol}: {e}")
+            continue
+            
     return full_res
 
 # --- MAIN DISPLAY ---
 st.title("🏛️ SUSTAINABLE FINANCE ASSET TERMINAL")
 
 if not tickers:
-    st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar เพื่อเริ่มต้นการวิเคราะห์")
+    st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้น")
 else:
     analysis = fetch_pro_data(tickers)
-    if analysis:
+    
+    if not analysis:
+        st.warning("❌ ไม่สามารถดึงข้อมูลหุ้นได้ โปรดตรวจสอบชื่อ Ticker (เช่น PTT.BK) หรือรีเฟรชหน้าเว็บ")
+    else:
         # Overview Cards
         cols = st.columns(len(analysis))
         for i, (symbol, d) in enumerate(analysis.items()):
@@ -155,11 +166,11 @@ else:
         tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
-                # 📈 Price History Chart (คืนค่ากราฟราคากลับมา)
+                # 1. กราฟราคา (ต้องขึ้น)
                 st.subheader(f"📈 Price Performance: {symbol}")
                 st.line_chart(d['history'], color="#00ff88")
 
-                # 📊 Summary Statistics (คืนค่าตาราง Summary แบบเดิม)
+                # 2. Market Summary
                 st.subheader(f"📊 Market Summary: {symbol}")
                 inf = d.get('info', {})
                 s1, s2 = st.columns(2)
@@ -171,20 +182,12 @@ else:
                     except: return str(v)
 
                 with s1:
-                    st.markdown(f"""<table class="stats-table">
-                        <tr><td>Market Cap</td><td style="text-align:right">{get_val('marketCap', '{:,.0f}')}</td></tr>
-                        <tr><td>Trailing P/E</td><td style="text-align:right">{get_val('trailingPE')}</td></tr>
-                        <tr><td>Beta (5Y)</td><td style="text-align:right">{get_val('beta')}</td></tr>
-                    </table>""", unsafe_allow_html=True)
+                    st.markdown(f'<table class="stats-table"><tr><td>Market Cap</td><td style="text-align:right">{get_val("marketCap", "{:,.0f}")}</td></tr><tr><td>Trailing P/E</td><td style="text-align:right">{get_val("trailingPE")}</td></tr><tr><td>Beta (5Y)</td><td style="text-align:right">{get_val("beta")}</td></tr></table>', unsafe_allow_html=True)
                 with s2:
-                    st.markdown(f"""<table class="stats-table">
-                        <tr><td>Profit Margin</td><td style="text-align:right">{get_val('profitMargins', '{:.2%}')}</td></tr>
-                        <tr><td>Dividend Yield</td><td style="text-align:right">{get_val('dividendYield', '{:.2%}')}</td></tr>
-                        <tr><td>Debt/Equity</td><td style="text-align:right">{get_val('debtToEquity')}</td></tr>
-                    </table>""", unsafe_allow_html=True)
+                    st.markdown(f'<table class="stats-table"><tr><td>Profit Margin</td><td style="text-align:right">{get_val("profitMargins", "{:.2%}")}</td></tr><tr><td>Dividend Yield</td><td style="text-align:right">{get_val("dividendYield", "{:.2%}")}</td></tr><tr><td>Debt/Equity</td><td style="text-align:right">{get_val("debtToEquity")}</td></tr></table>', unsafe_allow_html=True)
 
                 st.divider()
-                # 🛡️ Risk Matrix
+                # 3. Risk Matrix
                 st.subheader("🛡️ Comprehensive Climate Risk Matrix")
                 de_ratio = inf.get('debtToEquity', 100) or 100
                 dynamic_trans = d['c_beta'] * 100 * tax_multiplier
@@ -198,7 +201,7 @@ else:
                 r4.success(f"⚖️ Liability: Low")
 
                 st.divider()
-                # 📊 Charts (Gauge & Waterfall)
+                # 4. Gauge & Waterfall
                 c1, c2 = st.columns(2)
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
@@ -206,7 +209,8 @@ else:
                         gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "white"},
                         'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
                     fig_gauge.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=0, b=0))
-                    st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
+                    st.plotly_chart(fig_gauge, use_container_width=True, key=f"gauge_{symbol}")
+                
                 with c2:
                     st.subheader("💰 Equity Value Bridge (MB)")
                     mkt_cap_mb = float(inf.get('marketCap', 1e11))/1e6
@@ -217,28 +221,20 @@ else:
                         text = [f"{mkt_cap_mb:,.0f}", f"-{val_impact:,.0f}", f"{adj_val:,.0f}"], textposition = "outside",
                         increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
                     fig_water.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=0, b=0))
-                    st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
+                    st.plotly_chart(fig_water, use_container_width=True, key=f"water_{symbol}")
 
                 st.divider()
-                # 📰 Latest News Feed (คืนค่าส่วนของข่าวกลับมา)
+                # 5. News Feed
                 st.subheader(f"📰 Intelligence Feed: {symbol}")
                 if d['news']:
                     for n in d['news']:
-                        with st.container():
-                            st.markdown(f"**[{n.get('publisher', 'News')}]** {n.get('title')}")
-                            st.caption(f"🔗 [Read Article]({n.get('link')})")
+                        st.markdown(f"**[{n.get('publisher', 'News')}]** {n.get('title')}")
+                        st.caption(f"🔗 [Link]({n.get('link')})")
                 else:
                     st.write("No recent news found.")
 
-                st.divider()
-                # 📟 Terminal Risk Log
-                with st.expander("📟 View Terminal Risk Log (Activity)", expanded=False):
-                    st.markdown(f"""
-                    <div class="log-terminal">
-                        <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STRESS_TEST: Initializing for {symbol}...</div>
-                        <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STATUS: COMPLETED. All parameters synchronized.</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                with st.expander("📟 Terminal Log", expanded=False):
+                    st.markdown(f'<div class="log-terminal"><div class="log-entry">[{datetime.now().strftime("%H:%M:%S")}] > SUCCESS: Data synchronized.</div></div>', unsafe_allow_html=True)
 
 # --- FOOTER ---
 st.markdown(f'<div class="footer">🏛️ Sustainable Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
