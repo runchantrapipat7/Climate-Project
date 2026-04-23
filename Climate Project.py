@@ -158,9 +158,24 @@ if tickers:
                     st.line_chart(d['history'], height=250)
                 with m2:
                     st.subheader("📰 Combined Insights")
-                    for n in d['news']:
-                        st.caption(f"**{n.get('publisher','N/A')}**")
-                        st.write(n.get('title','N/A'))
-                        st.divider()
+                    # ดึงข่าวสารล่าสุดและจัดการกรณีข้อมูลไม่ครบ
+                    news_list = d.get('news', [])
+                    if news_list:
+                        for n in news_list:
+                            # ใช้ .get() เพื่อป้องกันการขึ้น N/A
+                            publisher = n.get('publisher', 'Market Source')
+                            title = n.get('title', 'No recent headline available')
+                            link = n.get('link', '#')
+                            
+                            st.markdown(f"**[{publisher}]**")
+                            st.write(title)
+                            if link != '#':
+                                st.caption(f"[อ่านต่อแบบเต็ม]({link})")
+                            st.divider()
+                    else:
+                        # หากไม่มีข่าว ให้แสดงบทวิเคราะห์ Climate Risk สั้นๆ เป็นการทดแทน
+                        st.info(f"ขณะนี้ไม่มีข่าวใหม่สำหรับ {symbol} ระบบจึงสรุปความเสี่ยงภูมิอากาศให้แทน:")
+                        st.write(f"- ค่า Carbon Beta ปัจจุบันอยู่ที่ {d['c_beta']:.3f}")
+                        st.write(f"- แนะนำให้เฝ้าระวังประเด็น {scenario} อย่างต่อเนื่อง")
     else:
         st.error("❌ ไม่พบข้อมูล Ticker หรือการเชื่อมต่อฐานข้อมูลขัดข้อง กรุณาลองใหม่อีกครั้ง")
