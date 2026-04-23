@@ -70,10 +70,10 @@ with st.sidebar:
     stocks_html = "".join([f'<div class="top-pick-item"><span>{s["symbol"]}</span><span style="color:#8b949e; font-size:0.7rem;">Active Vol.</span></div>' for s in top_stocks])
     st.markdown(f'<div class="top-pick-container"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p>{stocks_html}</div>', unsafe_allow_html=True)
 
-    with st.expander("🔍 Asset Selection", expanded=True):
-        t1 = st.text_input("Asset 1", "PTT.BK")
-        t2 = st.text_input("Asset 2", "EA.BK")
-        t3 = st.text_input("Asset 3", "")
+    with st.expander("🔍 Stock Selection", expanded=True):
+        t1 = st.text_input("Stock 1", "PTT.BK")
+        t2 = st.text_input("Stock 2", "EA.BK")
+        t3 = st.text_input("Stock 3", "")
     
     st.divider()
     with st.expander("🌍 Scenario Policy (TCFD)", expanded=True):
@@ -147,7 +147,7 @@ def fetch_pro_data(ticker_list):
     return full_res
 
 # --- MAIN DISPLAY ---
-st.title("🏛️ SUSTAINABLE FINANCE ASSET TERMINAL")
+st.title("🏛️ CLIMATE RISK MODELING AND SUSTAINABLE FINANCE ")
 
 if not tickers:
     st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้น")
@@ -237,4 +237,4 @@ else:
                     st.markdown(f'<div class="log-terminal"><div class="log-entry">[{datetime.now().strftime("%H:%M:%S")}] > SUCCESS: Data synchronized.</div></div>', unsafe_allow_html=True)
 
 # --- FOOTER ---
-st.markdown(f'<div class="footer">🏛️ Sustainable Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer">🏛️ Climate Risk Modeling and Sustainable Finance | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
