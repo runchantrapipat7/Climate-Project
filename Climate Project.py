@@ -53,6 +53,16 @@ with st.sidebar:
     market_cap = st.number_input("Market Value (Million THB):", value=100000, key="mcap")
     wacc = st.slider("WACC (%):", 5.0, 15.0, 8.0, key="wacc") / 100
 
+# เพิ่มส่วนนี้ไว้ใน Sidebar เพื่อแนะนำผู้ใช้
+with st.sidebar:
+    st.info("""
+    **💡 Ticker แนะนำสำหรับการทดสอบ:**
+    - **หุ้นไทย:** PTT.BK, SCC.BK, CPALL.BK
+    - **กองทุนหุ้นไทย:** ^SET.BK
+    - **กองทุน S&P 500:** ^GSPC
+    - **กองทุน Nasdaq:** ^IXIC
+    """)
+
 # --- CORE LOGIC ---
 @st.cache_data(ttl=3600)
 def fetch_and_model(symbol):
