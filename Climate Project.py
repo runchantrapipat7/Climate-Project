@@ -33,7 +33,7 @@ st.markdown("""
 with st.sidebar:
     st.title("⚖️ Portfolio Intelligence")
     
-    # --- คืนหัวข้อที่คุณต้องการตรงนี้ครับ ---
+    # หัวข้อสำคัญที่คุณต้องการ
     st.header("🔍 ระบุชื่อหุ้นหรือกองทุน (Stock or Bond)")
     t1 = st.text_input("Asset 1", "PTT.BK")
     t2 = st.text_input("Asset 2", "EA.BK")
@@ -48,13 +48,13 @@ with st.sidebar:
     flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
     wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
 
-# --- DATA ENGINE (FIXED STABILITY) ---
+# --- DATA ENGINE ---
 @st.cache_data(ttl=300)
 def fetch_robust_data(ticker_list):
     full_res = {}
     history_map = {}
     
-    # ดึงข้อมูล Proxy เพื่อใช้คำนวณ Carbon Beta จริงๆ
+    # ข้อมูล Proxy สำหรับคำนวณ Carbon Beta
     try:
         proxies = yf.download(["PTTEP.BK", "EA.BK", "^SET.BK"], period="2y", progress=False)['Close']
         proxies = proxies.ffill().bfill()
@@ -65,12 +65,11 @@ def fetch_robust_data(ticker_list):
         try:
             t_obj = yf.Ticker(symbol)
             hist = t_obj.history(period="2y")['Close']
-            
             if hist.empty: continue
             
             history_map[symbol] = hist
             
-            # คำนวณ Carbon Beta จริงๆ
+            # การคำนวณความเสี่ยง Transition Risk
             c_beta, m_beta = 0.0, 1.0
             if not proxies.empty:
                 try:
@@ -82,28 +81,28 @@ def fetch_robust_data(ticker_list):
                 except: pass
 
             full_res[symbol] = {
-                "last_price": hist.iloc[-1],
+                "last_price": float(hist.iloc[-1]),
                 "history": hist,
                 "carbon_beta": c_beta,
                 "market_beta": m_beta,
                 "info": t_obj.info if t_obj.info else {},
                 "news": t_obj.news[:5] if t_obj.news else []
             }
-            time.sleep(0.2)
+            time.sleep(0.1)
         except: continue
             
     return full_res, pd.DataFrame(history_map)
 
 # --- MAIN DISPLAY ---
 st.title("🏛️ Sustainable Finance & Climate Risk Modeling")
-st.markdown(f"Market Intelligence Terminal | {datetime.now().strftime('%d %Y')}")
+st.markdown(f"Market Intelligence Terminal | {datetime.now().strftime('%d %B %Y')}")
 
 if tickers:
-    with st.spinner('กำลังเชื่อมต่อฐานข้อมูล...'):
+    with st.spinner('กำลังประมวลผลข้อมูล...'):
         analysis, history = fetch_robust_data(tickers)
     
     if analysis:
-        # Overview Metrics
+        # Overview
         cols = st.columns(len(analysis))
         for i, (symbol, d) in enumerate(analysis.items()):
             cols[i].metric(f"💎 {symbol}", f"{d['last_price']:,.2f}", delta=f"C-Beta: {d['carbon_beta']:.3f}")
@@ -117,7 +116,6 @@ if tickers:
                 f1.metric("Current Price", f"{d['last_price']:,.2f}")
                 f2.metric("Market Beta", f"{d['market_beta']:.2f}")
                 
-                # ป้องกัน Error กรณีไม่มีข้อมูลพื้นฐาน
                 m_cap = d['info'].get('marketCap')
                 f3.metric("Div. Yield", f"{d['info'].get('dividendYield', 0)*100:.2f}%" if d['info'].get('dividendYield') else "N/A")
                 f4.metric("Market Cap", f"{m_cap/1e9:.1f}B" if m_cap else "N/A")
@@ -135,30 +133,38 @@ if tickers:
                     fig_gauge.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_gauge, use_container_width=True)
 
-                # Waterfall Chart (แก้ Error ValueError ที่นี่)
+                # Waterfall Chart (จุดที่แก้ไข Error - จัดเรียงพารามิเตอร์ใหม่)
                 st.divider()
                 st.subheader("💰 Equity Value Bridge (MB)")
                 mkt_cap_mb = float(m_cap)/1e6 if m_cap else 1000.0
                 val_impact = (tax_price * 1000) / wacc / 1e6
                 
-                # FIXED: เพิ่มพารามิเตอร์ 'y' ให้ครบถ้วน
+                # เรียงพารามิเตอร์ x, y, measure ให้ถูกต้องตาม Plotly Schema
                 fig_water = go.Figure(go.Waterfall(
+                    name = "Climate Impact",
                     orientation = "v",
+                    measure = ["relative", "relative", "total"],
                     x = ["Current Cap", "Climate Loss", "Adjusted Value"],
                     y = [mkt_cap_mb, -val_impact, mkt_cap_mb - val_impact],
-                    measure = ["relative", "relative", "total"],
-                    decreasing = {"marker":{"color":"#E74C3C"}},
-                    total = {"marker":{"color":"#3498DB"}}
+                    decreasing = {"marker": {"color": "#E74C3C"}},
+                    totals = {"marker": {"color": "#3498DB"}}
                 ))
-                fig_water.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
-                st.plotly_chart(fig_water, use_container_width=True)
                 
+                fig_water.update_layout(
+                    height=400,
+                    showlegend=False,
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font={'color': "white"}
+                )
+                st.plotly_chart(fig_water, use_container_width=True)
+                st.info(f"**Sustainable Finance Insight:** ความเสี่ยง {scenario} ส่งผลให้มูลค่าลดลง -{val_impact:,.2f} MB")
+
                 # News
-                st.subheader("📰 Latest News")
+                st.subheader("📰 Latest News & Research")
                 if d['news']:
                     for n in d['news']:
                         st.write(f"**[{n.get('publisher','N/A')}]** {n.get('title','N/A')}")
                         st.write(f"[อ่านต่อ]({n.get('link','#')})")
                         st.divider()
     else:
-        st.error("❌ ไม่พบข้อมูลสำหรับรายชื่อที่ระบุ กรุณารอ 10 วินาทีแล้วลอง Refresh หรือใช้ Ticker อื่น (เช่น PTT.BK, EA.BK)")
+        st.error("❌ ไม่พบข้อมูล Ticker หรือการเชื่อมต่อฐานข้อมูลขัดข้อง กรุณาลองใหม่อีกครั้ง")
