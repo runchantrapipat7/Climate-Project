@@ -10,24 +10,32 @@ import time
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE MODERN UI & TERMINAL LOG ---
+# --- CSS: ULTIMATE MODERN & MINIMALIST UI ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
-    .stTabs [aria-selected="true"] { background-color: #2ea043 !important; color: white !important; font-weight: bold; }
     
+    /* 🟢 Modern Tabs: เปลี่ยนเป็นแถบขีดสีเขียวด้านล่างเพื่อให้ดูทันสมัย */
+    .stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .stTabs [data-baseweb="tab"] { 
+        background-color: transparent; 
+        border: none; padding: 12px 0px; color: #8b949e; 
+        transition: all 0.3s ease;
+    }
+    .stTabs [aria-selected="true"] { 
+        background-color: transparent !important; 
+        color: #00ff88 !important; /* เขียวนีออน */
+        border-bottom: 3px solid #00ff88 !important; /* ขีดเส้นใต้ */
+        font-weight: bold;
+    }
+
     /* 💡 หุ้นเด่นวันนี้ในกรอบเดียว */
     .top-pick-container { border: 1px solid #2ea043; border-radius: 12px; padding: 15px; background: rgba(46, 160, 67, 0.08); box-shadow: 0 0 15px rgba(46, 160, 67, 0.15); margin-bottom: 25px; }
     .top-pick-title { color: #00ff88; font-weight: bold; font-size: 1.05rem; margin: 0; text-align: center; border-bottom: 1px solid rgba(46,160,67,0.3); padding-bottom: 10px; margin-bottom: 15px; }
     .top-pick-item { font-size: 0.88rem; font-weight: bold; margin-bottom: 12px; color: white; display: flex; justify-content: space-between; }
     
     /* 📟 Terminal Log Style (Collapsible) */
-    .log-terminal { 
-        background: #000000 !important; 
-        border: 1px solid #2ea043 !important; 
-        border-radius: 8px !important; 
-        font-family: 'Courier New', Courier, monospace !important;
-    }
+    .log-terminal { background: #000000 !important; border: 1px solid #2ea043 !important; border-radius: 8px; font-family: 'Courier New', Courier, monospace !important; padding: 15px; }
     .log-entry { color: #00ff88; font-size: 0.85rem; margin-bottom: 5px; line-height: 1.4; }
     .log-entry span { color: #8b949e; }
 
@@ -107,7 +115,7 @@ def fetch_pro_data(ticker_list):
 st.title("🏛️ SUSTAINABLE FINANCE ASSET TERMINAL")
 
 if not tickers:
-    st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้นการวิเคราะห์")
+    st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar เพื่อเริ่มต้นการวิเคราะห์")
 else:
     analysis = fetch_pro_data(tickers)
     if analysis:
@@ -116,10 +124,11 @@ else:
         for i, (symbol, d) in enumerate(analysis.items()):
             cols[i].metric(f"💎 {symbol}", f"{d['price']:,.2f}", delta=f"C-Beta: {d['c_beta']:.3f}")
 
+        # Modern Tabs Layout
         tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
-                # 📊 Summary Stats
+                # 📊 Summary Statistics
                 st.subheader(f"📊 Market Summary: {symbol}")
                 inf = d.get('info', {})
                 s1, s2 = st.columns(2)
@@ -177,16 +186,15 @@ else:
                             st.write(f"**{n.get('publisher','News')}**: {n.get('title')}")
                             st.divider()
 
-                # 📝 NEW: COLLAPSIBLE TERMINAL LOG (Bottom Placement)
-                st.write("") # Spacer
+                # 📝 COLLAPSIBLE TERMINAL LOG
+                st.write("") 
                 with st.expander("📟 View Terminal Risk Log (Activity)", expanded=False):
                     st.markdown(f"""
                     <div class="log-terminal">
                         <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STRESS_TEST: Initializing for {symbol}...</div>
                         <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > ENGINE: Applying Scenario "{scenario}"</div>
                         <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > COMPUTE: Carbon Sensitivity factor at {dynamic_trans:.2f}</div>
-                        <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > AUDIT: Debt/Equity check at {get_val("debtToEquity")}. Status: {credit_risk}</div>
-                        <div class="log-entry" style="color:#ffffff;"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STATUS: COMPLETED. All parameters within safe margins.</div>
+                        <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STATUS: COMPLETED. All parameters synchronized.</div>
                     </div>
                     """, unsafe_allow_html=True)
 
