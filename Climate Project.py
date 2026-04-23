@@ -9,7 +9,7 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE MODERN UI & GLASSMORPHISM ---
+# --- CSS: ULTIMATE MODERN UI & GREEN TABS ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -40,6 +40,8 @@ st.markdown("""
     div[data-testid="stMetric"] { background: rgba(255, 255, 255, 0.03) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; }
     .insight-card { background: rgba(0, 255, 136, 0.05); border-left: 4px solid #00ff88; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem; }
     .risk-card { background: rgba(255, 75, 75, 0.05); border-left: 4px solid #ff4b4b; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem; }
+    
+    /* ตารางสถิติแบบ Yahoo Finance */
     .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
     .stats-table td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
     .stats-label { color: #8b949e; }
@@ -50,7 +52,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- DYNAMIC TOP PICKS ENGINE ---
+# --- DYNAMIC TOP PICKS ENGINE (5 STOCKS) ---
 @st.cache_data(ttl=3600)
 def get_real_top_picks_5():
     candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
@@ -67,7 +69,7 @@ def get_real_top_picks_5():
 with st.sidebar:
     st.title("🛡️ Risk Controller")
     
-    # 💡 หุ้นเด่นวันนี้ (Fixed HTML)
+    # หุ้นเด่นวันนี้ 5 ตัวในกรอบเดียว
     top_stocks = get_real_top_picks_5()
     stocks_html = "".join([f'<div class="top-pick-item"><span>{s["symbol"]}</span><span class="active-vol-label">Active Vol.</span></div>' for s in top_stocks])
     st.markdown(f'<div class="top-pick-container"><div class="top-pick-header-box"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p></div>{stocks_html}<div class="top-pick-subtext">อัปเดตข้อมูลจาก Yahoo Finance รายวัน</div></div>', unsafe_allow_html=True)
@@ -80,6 +82,7 @@ with st.sidebar:
     st.divider()
     with st.expander("🌍 Scenario & Policy (TCFD)", expanded=True):
         scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
+        # ตัวแปรควบคุมการขยับของเข็ม Gauge
         tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
         tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
     
@@ -129,7 +132,7 @@ if tickers:
         tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
-                # 📊 Statistics
+                # 📊 Market Statistics
                 st.subheader(f"📊 Market Summary: {symbol}")
                 inf = d.get('info', {})
                 s1, s2 = st.columns(2)
@@ -145,26 +148,27 @@ if tickers:
                 c1, c2 = st.columns(2)
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
-                    # 💡 แก้ไข: ใช้ c_beta และคำนวณแบบ Dynamic เพื่อให้เข็มขยับ
+                    # 💡 แก้ไข: คำนวณ Dynamic Risk เพื่อให้เข็มขยับตาม Sidebar
                     dynamic_risk = d['c_beta'] * 100 * tax_multiplier
                     fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = dynamic_risk,
                         gauge = {'axis': {'range': [-50, 50], 'tickcolor': "white"}, 'bar': {'color': "white"},
                         'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
-                    fig_gauge.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+                    fig_gauge.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=0, b=0))
                     st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
-                    st.markdown(f'<div class="risk-card"><b>Insight:</b> ค่าความเสี่ยง C-Beta ที่ปรับตาม Scenario คือ <b>{dynamic_risk:.2f}</b></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="risk-card"><b>Insight:</b> ค่าความเสี่ยง C-Beta ปรับปรุงตามนโยบายปัจจุบันคือ <b>{dynamic_risk:.2f}</b></div>', unsafe_allow_html=True)
                 
                 with c2:
                     st.subheader("💰 Equity Value Bridge (MB)")
                     mkt_cap_mb = float(inf.get('marketCap', 1e11))/1e6
                     val_impact = (tax_price * 1000) / wacc / 1e6
+                    adj_val = mkt_cap_mb - val_impact
                     fig_water = go.Figure(go.Waterfall(orientation = "v", measure = ["relative", "relative", "total"],
-                        x = ["Initial Cap", "Climate Loss", "Adj. Value"], y = [mkt_cap_mb, -val_impact, mkt_cap_mb - val_impact],
-                        text = [f"{mkt_cap_mb:,.0f}", f"-{val_impact:,.0f}", f"{(mkt_cap_mb-val_impact):,.0f}"], textposition = "outside",
+                        x = ["Initial Cap", "Climate Loss", "Adj. Value"], y = [mkt_cap_mb, -val_impact, adj_val],
+                        text = [f"{mkt_cap_mb:,.0f}", f"-{val_impact:,.0f}", f"{adj_val:,.0f}"], textposition = "outside",
                         increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
-                    fig_water.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+                    fig_water.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=0, b=0))
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
-                    st.markdown(f'<div class="insight-card"><b>Insight:</b> คาดการณ์มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="insight-card"><b>Insight:</b> คาดการณ์มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b> จาก Climate Risk</div>', unsafe_allow_html=True)
                 
                 st.divider()
                 m1, m2 = st.columns([1.5, 1])
@@ -177,6 +181,7 @@ if tickers:
                         for n in d['news']:
                             st.write(f"**{n.get('publisher','Source')}**: {n.get('title','Latest Update')}")
                             st.divider()
+                    else: st.info(f"No recent news for {symbol}.")
 
 # --- FOOTER ---
 st.markdown(f'<div class="footer">🏛️ Sustainable Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
