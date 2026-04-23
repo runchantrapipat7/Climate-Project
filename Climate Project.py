@@ -203,13 +203,28 @@ if tickers:
                 c1, c2 = st.columns(2)
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
-                    risk_score = d['c_beta'] * 100 * tax_multiplier
-                    fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = risk_score,
-                        gauge = {'axis': {'range': [-50, 50], 'tickcolor': "white"}, 'bar': {'color': "white"},
-                        'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
-                    fig_gauge.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+                    
+                    # 💡 แก้ไข: นำค่า multiplier มาคำนวณเพื่อให้เข็มขยับตาม Sidebar
+                    # tax_multiplier จะถูกกำหนดจาก Scenario ที่เลือก (Net Zero=1.5, Delayed=1.0, Current=0.5)
+                    adjusted_risk_score = d['carbon_beta'] * 100 * tax_multiplier
+                    
+                    fig_gauge = go.Figure(go.Indicator(
+                        mode = "gauge+number", 
+                        value = adjusted_risk_score,
+                        gauge = {
+                            'axis': {'range': [-50, 50], 'tickcolor': "white"},
+                            'bar': {'color': "white"},
+                            'steps': [
+                                {'range': [-50, 0], 'color': '#238636'},   # Low Risk (Green)
+                                {'range': [0, 20], 'color': '#f1e05a'},    # Med Risk (Yellow)
+                                {'range': [20, 50], 'color': '#da3633'}]   # High Risk (Red)
+                        }))
+                    
+                    fig_gauge.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
-                    st.markdown(f'<div class="risk-card"><b>Insight:</b> ความเสี่ยง C-Beta คือ <b>{risk_score:.2f}</b></div>', unsafe_allow_html=True)
+    
+                    # แสดง Insight ที่อัปเดตตามการคำนวณใหม่
+                    st.markdown(f'<div class="risk-card"><b>Insight:</b> ค่าความเสี่ยง C-Beta ที่ปรับตาม Scenario คือ <b>{adjusted_risk_score:.2f}</b></div>', unsafe_allow_html=True)
                 with c2:
                     st.subheader("💰 Equity Value Bridge (MB)")
                     mkt_cap_mb = float(inf.get('marketCap', 1e11))/1e6
