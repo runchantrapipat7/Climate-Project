@@ -10,34 +10,46 @@ import time
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: MODERN UI & INTELLIGENCE BOX TABS ---
+# --- CSS: ULTIMATE DARK TERMINAL UI ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
     
-    /* 🟢 คืนค่า Intelligence Center ให้เป็นกรอบสวยเหมือนเดิม */
-    .stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 8px; border: none; }
+    /* 💎 คืนค่ากรอบราคาหุ้น (Metric Cards) ให้สวยพรีเมียม */
+    div[data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(0, 255, 136, 0.2) !important;
+        border-radius: 12px !important;
+        padding: 20px !important;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3) !important;
+    }
+    div[data-testid="stMetricValue"] > div { 
+        color: #00ff88 !important; 
+        font-family: 'Inter', sans-serif;
+        font-weight: 700 !important;
+    }
+
+    /* 🟢 Intelligence Center Box Style */
+    .stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 10px; border: none; }
     .stTabs [data-baseweb="tab"] { 
         background-color: rgba(255, 255, 255, 0.05); 
         border-radius: 4px; padding: 10px 20px; color: #8b949e; border: none;
-        transition: all 0.2s ease;
     }
     .stTabs [aria-selected="true"] { 
-        background-color: #2ea043 !important; /* กรอบสีเขียวทึบ */
+        background-color: #2ea043 !important; 
         color: white !important; 
         font-weight: bold;
         box-shadow: 0 4px 12px rgba(46, 160, 67, 0.3);
     }
 
-    /* 💡 หุ้นเด่นวันนี้ในกรอบเดียว */
+    /* 💡 Sidebar: หุ้นเด่นวันนี้ในกรอบเดียว */
     .top-pick-container { border: 1px solid #2ea043; border-radius: 12px; padding: 15px; background: rgba(46, 160, 67, 0.08); box-shadow: 0 0 15px rgba(46, 160, 67, 0.15); margin-bottom: 25px; }
     .top-pick-title { color: #00ff88; font-weight: bold; font-size: 1.05rem; margin: 0; text-align: center; border-bottom: 1px solid rgba(46,160,67,0.3); padding-bottom: 10px; margin-bottom: 15px; }
     .top-pick-item { font-size: 0.88rem; font-weight: bold; margin-bottom: 12px; color: white; display: flex; justify-content: space-between; }
     
     /* 📟 Terminal Log Style (Collapsible) */
     .log-terminal { background: #000000 !important; border: 1px solid #2ea043 !important; border-radius: 8px; font-family: 'Courier New', Courier, monospace !important; padding: 15px; }
-    .log-entry { color: #00ff88; font-size: 0.85rem; margin-bottom: 5px; line-height: 1.4; }
-    .log-entry span { color: #8b949e; }
+    .log-entry { color: #00ff88; font-size: 0.85rem; margin-bottom: 5px; }
 
     .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
     .stats-table td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
@@ -47,7 +59,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- DYNAMIC TOP PICKS ENGINE ---
+# --- TOP PICKS ENGINE ---
 @st.cache_data(ttl=3600)
 def get_real_top_picks_5():
     candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
@@ -119,12 +131,12 @@ if not tickers:
 else:
     analysis = fetch_pro_data(tickers)
     if analysis:
-        # Overview Cards
+        # Overview Cards (กรอบสวยกลับมาแล้ว!)
         cols = st.columns(len(analysis))
         for i, (symbol, d) in enumerate(analysis.items()):
             cols[i].metric(f"💎 {symbol}", f"{d['price']:,.2f}", delta=f"C-Beta: {d['c_beta']:.3f}")
 
-        #Intelligence Box Tabs Layout
+        # Intelligence Box Tabs
         tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
@@ -140,8 +152,8 @@ else:
                 with s2:
                     st.markdown(f'<table class="stats-table"><tr><td class="stats-label">Profit Margin</td><td class="stats-value">{get_val("profitMargins", "{:.2%}")}</td></tr><tr><td class="stats-label">Dividend Yield</td><td class="stats-value">{get_val("dividendYield", "{:.2%}")}</td></tr><tr><td class="stats-label">Debt/Equity</td><td class="stats-value">{get_val("debtToEquity")}</td></tr></table>', unsafe_allow_html=True)
 
-                # 🛡️ Risk Matrix
                 st.divider()
+                # 🛡️ Risk Matrix
                 st.subheader("🛡️ Comprehensive Climate Risk Matrix")
                 de_ratio = inf.get('debtToEquity', 100) or 100
                 dynamic_trans = d['c_beta'] * 100 * tax_multiplier
@@ -155,7 +167,7 @@ else:
                 r4.success(f"⚖️ Liability: Low")
 
                 st.divider()
-                # 📈 Charts (Dynamic Movement)
+                # 📈 Charts (Dynamic)
                 c1, c2 = st.columns(2)
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
@@ -177,23 +189,11 @@ else:
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
 
                 st.divider()
-                st.subheader("📈 Price Momentum & Insights")
-                m1, m2 = st.columns([1.5, 1])
-                with m1: st.line_chart(d['history'], height=250)
-                with m2:
-                    if d['news']:
-                        for n in d['news']:
-                            st.write(f"**{n.get('publisher','News')}**: {n.get('title')}")
-                            st.divider()
-
-                # 📝 COLLAPSIBLE TERMINAL LOG
-                st.write("") 
+                # 📟 Collapsible Log (Bottom)
                 with st.expander("📟 View Terminal Risk Log (Activity)", expanded=False):
                     st.markdown(f"""
                     <div class="log-terminal">
                         <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STRESS_TEST: Initializing for {symbol}...</div>
-                        <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > ENGINE: Applying Scenario "{scenario}"</div>
-                        <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > COMPUTE: Carbon Sensitivity factor at {dynamic_trans:.2f}</div>
                         <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STATUS: COMPLETED. All parameters synchronized.</div>
                     </div>
                     """, unsafe_allow_html=True)
