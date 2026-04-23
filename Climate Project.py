@@ -8,9 +8,9 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Ultimate Climate Finance Intelligence", layout="wide")
+st.set_page_config(page_title="Sustainable Finance Analyzer", layout="wide")
 
-# --- CSS: Modern Design ---
+# --- CSS: Modern Dashboard Style ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -31,22 +31,25 @@ st.markdown("""
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("⚖️ Portfolio Intelligence")
+    st.write("ระบุหุ้น/กองทุน (แยกด้วยคอมม่า หรือใส่ทีละช่อง)")
     t1 = st.text_input("Asset 1", "PTT.BK")
-    t2 = st.text_input("Asset 2", "BTS.BK")
+    t2 = st.text_input("Asset 2", "EA.BK")
     t3 = st.text_input("Asset 3", "")
     tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
     st.divider()
-    st.header("🌍 Scenario & Policy")
+    st.header("🌍 Scenario & Policy (TCFD)")
     scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
     tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
     
+    st.divider()
+    st.header("🌊 Physical Risk Control")
     flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
     wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
 
 # --- DATA ENGINE ---
 @st.cache_data(ttl=3600)
-def fetch_analysis_data(ticker_list):
+def fetch_safe_data(ticker_list):
     try:
         all_fetch = ticker_list + ["PTTEP.BK", "EA.BK", "^SET.BK"]
         data = yf.download(all_fetch, period="5y", interval="1d", progress=False)['Close']
@@ -59,6 +62,7 @@ def fetch_analysis_data(ticker_list):
                 stock_history = data[symbol].dropna()
                 if stock_history.empty: continue
                 
+                # Modeling Transition Risk
                 try:
                     mkt_data = data[["PTTEP.BK", "EA.BK", "^SET.BK"]].dropna()
                     combined = pd.concat([stock_history, mkt_data], axis=1).pct_change().dropna()
@@ -80,12 +84,12 @@ def fetch_analysis_data(ticker_list):
         return full_res, data[ticker_list].dropna()
     except: return None, None
 
-# --- DISPLAY ---
-st.title("🏛️ Sustainable Finance & Climate Risk Modeling")
-st.markdown(f"Asset Intelligence Terminal | {datetime.now().strftime('%d %B %Y')}")
+# --- MAIN DISPLAY ---
+st.title("🏛️ Sustainable Finance & Climate Risk Intelligence")
+st.markdown(f"Market Intelligence Terminal | {datetime.now().strftime('%d %B %Y')}")
 
 if tickers:
-    analysis, history = fetch_analysis_data(tickers)
+    analysis, history = fetch_safe_data(tickers)
     
     if analysis:
         # Overview Cards
@@ -94,22 +98,21 @@ if tickers:
             cols[i].metric(f"💎 {symbol}", f"{d['last_price']:,.2f}", delta=f"C-Beta: {d['carbon_beta']:.3f}")
 
         # Deep Dive Tabs
-        tabs = st.tabs([f"Intelligence: {s}" for s in analysis.keys()])
+        tabs = st.tabs([f"Asset: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
-                st.markdown(f"### 🧬 {symbol} Financial Snapshot")
+                # Row 1: Fundamentals
                 f1, f2, f3, f4 = st.columns(4)
                 f1.metric("P/E Ratio", d['info'].get('trailingPE', 'N/A'))
                 f2.metric("Div. Yield", f"{d['info'].get('dividendYield', 0)*100:.2f}%")
                 f3.metric("Market Cap", f"{d['info'].get('marketCap', 0)/1e9:.1f}B")
                 f4.metric("Market Beta", f"{d['market_beta']:.2f}")
 
-                # Charts
+                # Row 2: Charts
                 c_l, c_r = st.columns([2, 1])
                 with c_l:
                     st.subheader("📈 Price Momentum")
                     st.line_chart(d['history'])
-                
                 with c_r:
                     st.subheader("🔥 Carbon Sensitivity")
                     fig_gauge = go.Figure(go.Indicator(
@@ -118,21 +121,20 @@ if tickers:
                     fig_gauge.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_gauge, use_container_width=True)
 
+                # Row 3: Climate Valuation (Waterfall)
                 st.divider()
                 r_l, r_r = st.columns(2)
                 with r_l:
                     st.subheader("💰 Equity Value Bridge (MB)")
-                    # FIXED LOGIC: ป้องกัน ValueError
+                    # ป้องกัน ValueError โดยเช็คค่า Market Cap
                     mkt_cap_raw = d['info'].get('marketCap')
                     mkt_cap_mb = float(mkt_cap_raw)/1e6 if mkt_cap_raw else 1000.0
                     val_impact = (tax_price * 1000) / wacc / 1e6
                     
-                    st.info(f"**Research:** {symbol} เสี่ยงอุทกภัย {flood_risk}% | ผลกระทบมูลค่า: -{val_impact:,.2f}M")
+                    st.info(f"**Climate Insight:** {symbol} เสี่ยงอุทกภัย {flood_risk}% | มูลค่าที่หายไป: -{val_impact:,.2f}M")
                     
-                    # จุดที่แก้ไข: เพิ่มตัวแปร 'y' และจัดการค่าคงที่
                     fig_water = go.Figure(go.Waterfall(
-                        orientation = "v",
-                        x = ["Current Cap", "Climate Loss", "Adjusted Value"],
+                        orientation = "v", x = ["Current Cap", "Climate Loss", "Adjusted Value"],
                         y = [mkt_cap_mb, -val_impact, mkt_cap_mb - val_impact],
                         measure = ["relative", "relative", "total"],
                         decreasing = {"marker":{"color":"#E74C3C"}},
@@ -143,6 +145,16 @@ if tickers:
 
                 with r_r:
                     st.subheader("📰 Latest Insights")
-                    for n in d['news']:
-                        st.write(f"**[{n.get('publisher','N/A')}]** {n.get('title','N/A')}")
-                        st.divider()
+                    if d['news']:
+                        for n in d['news']:
+                            st.write(f"**[{n.get('publisher','N/A')}]** {n.get('title','N/A')}")
+                            st.divider()
+                    else: st.warning("ไม่พบข่าวสารล่าสุด")
+
+        # 3. Overall Comparative Chart
+        st.divider()
+        st.subheader("📉 Multi-Asset Relative Performance")
+        norm_prices = (history / history.iloc[0]) * 100
+        st.line_chart(norm_prices)
+
+    else: st.error("❌ ไม่พบข้อมูล Ticker ที่ระบุ กรุณาตรวจสอบ (เช่น PTT.BK)")
