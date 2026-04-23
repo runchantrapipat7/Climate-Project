@@ -8,27 +8,39 @@ from datetime import datetime
 import time
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Sustainable Finance Intelligence", layout="wide")
+st.set_page_config(page_title="Climate Finance Pro", layout="wide")
 
-# --- CSS: Ultimate Dashboard Theme ---
+# --- CSS: HIGH-END FINANCIAL TERMINAL UI ---
 st.markdown("""
     <style>
-    .main { background-color: #0b0e14; color: #ffffff; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+    
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #0d1117; }
+    
+    .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); }
+    
+    /* Modern Glassmorphism Cards */
     div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%) !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
-        border-radius: 16px; padding: 20px;
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+        border-radius: 12px; padding: 20px;
     }
-    div[data-testid="stMetricValue"] > div { color: #00ff88 !important; font-weight: 700; }
-    .stTabs [data-baseweb="tab-list"] { gap: 12px; }
+    
+    div[data-testid="stMetricValue"] > div { color: #00ff88 !important; font-weight: 600; letter-spacing: -1px; }
+    
+    /* Tab Styling */
+    .stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 10px; }
     .stTabs [data-baseweb="tab"] { 
-        background-color: rgba(255, 255, 255, 0.05); border-radius: 8px;
-        padding: 10px 30px; color: #aaa; border: none;
+        background-color: rgba(255, 255, 255, 0.05); 
+        border-radius: 8px; padding: 10px 25px; color: #8b949e; border: none;
     }
     .stTabs [aria-selected="true"] { 
-        background: linear-gradient(90deg, #00ff88 0%, #00bd68 100%); color: #000 !important; 
+        background: linear-gradient(135deg, #2ea043 0%, #238636 100%); 
+        color: white !important; font-weight: 600;
     }
-    h1, h2, h3 { font-family: 'Inter', sans-serif; letter-spacing: -0.5px; }
+    
+    hr { border-color: rgba(255,255,255,0.1); }
     </style>
     """, unsafe_allow_html=True)
 
@@ -43,7 +55,7 @@ with st.sidebar:
 
     st.divider()
     st.header("🌍 Scenario & Policy (TCFD)")
-    scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
+    scenario = st.select_slider("Ambition", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
     tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
     
     flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
@@ -51,7 +63,7 @@ with st.sidebar:
 
 # --- DATA ENGINE ---
 @st.cache_data(ttl=600)
-def fetch_terminal_data(ticker_list):
+def fetch_pro_data(ticker_list):
     full_res = {}
     try:
         proxies = yf.download(["PTTEP.BK", "EA.BK", "^SET.BK"], period="3y", progress=False)['Close']
@@ -64,7 +76,7 @@ def fetch_terminal_data(ticker_list):
             hist = t_obj.history(period="3y")['Close']
             if hist.empty: continue
             
-            # คำนวณ Carbon Beta (Transition Risk)
+            # Transition Risk Modeling
             c_beta = 0.0
             if not proxies.empty:
                 try:
@@ -90,38 +102,37 @@ st.title("🏛️ SUSTAINABLE FINANCE & CLIMATE RISK MODELING")
 st.markdown(f"**Asset Intelligence Terminal** | {datetime.now().strftime('%d %B %Y')}")
 
 if tickers:
-    analysis = fetch_terminal_data(tickers)
+    analysis = fetch_pro_data(tickers)
     
     if analysis:
-        # Comparative Cards
+        # Comparison Overview
         cols = st.columns(len(analysis))
         for i, (symbol, d) in enumerate(analysis.items()):
             cols[i].metric(f"💎 {symbol}", f"{d['price']:,.2f}", delta=f"C-Beta: {d['c_beta']:.3f}")
 
-        # Deep Dive Analysis
-        tabs = st.tabs([f"Terminal: {s}" for s in analysis.keys()])
+        # Deep Dive Tabs
+        tabs = st.tabs([f"Intelligence: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
-                # Row 1: Charts
                 c1, c2 = st.columns([1, 1.2])
                 
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
-                    # MODERN GAUGE
+                    # MODERN GAUGE WITH NEEDLE
                     val = d['c_beta'] * 100
                     fig_gauge = go.Figure(go.Indicator(
                         mode = "gauge+number", value = val,
-                        title = {'text': "Carbon Beta Index", 'font': {'size': 16}},
                         gauge = {
-                            'axis': {'range': [-50, 50], 'tickwidth': 1},
-                            'bar': {'color': "#00ff88" if val < 5 else "#ffcc00" if val < 15 else "#ff4b4b"},
+                            'axis': {'range': [-50, 50], 'tickwidth': 1, 'tickcolor': "#8b949e"},
+                            'bar': {'color': "rgba(255,255,255,0.7)"}, # Needle-like bar
+                            'bgcolor': "rgba(0,0,0,0)",
                             'steps': [
-                                {'range': [-50, 5], 'color': 'rgba(0, 255, 136, 0.1)'},
-                                {'range': [5, 15], 'color': 'rgba(255, 204, 0, 0.1)'},
-                                {'range': [15, 50], 'color': 'rgba(255, 75, 75, 0.1)'}],
+                                {'range': [-50, 0], 'color': '#238636'},   # Low Risk (Green)
+                                {'range': 0, 'color': '#f1e05a'},          # Med Risk (Yellow)
+                                {'range': [20, 50], 'color': '#da3633'}],   # High Risk (Red)
                             'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': val}
                         }))
-                    fig_gauge.update_layout(height=380, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=50, b=20))
+                    fig_gauge.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "Inter"}, margin=dict(t=50, b=20, l=30, r=30))
                     st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
 
                 with c2:
@@ -134,26 +145,27 @@ if tickers:
                     fig_water = go.Figure(go.Waterfall(
                         orientation = "v",
                         measure = ["relative", "relative", "total"],
-                        x = ["Initial Cap", "Climate Risk", "Adj. Value"],
+                        x = ["Initial Cap", "Climate Loss", "Adjusted Fair Value"],
                         y = [mkt_cap_mb, -val_impact, mkt_cap_mb - val_impact],
-                        increasing = {"marker":{"color":"#00ff88"}},
-                        decreasing = {"marker":{"color":"#ff4b4b"}},
-                        totals = {"marker":{"color":"#00a2ff"}}
+                        connector = {"line":{"color":"rgba(255,255,255,0.3)", "width": 1, "dash": "dot"}},
+                        increasing = {"marker":{"color":"#2ea043"}},
+                        decreasing = {"marker":{"color":"#da3633"}},
+                        totals = {"marker":{"color":"#1f6feb"}}
                     ))
-                    fig_water.update_layout(height=380, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+                    fig_water.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "white", 'family': "Inter"}, margin=dict(t=50, b=20))
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
 
-                # Row 2: Stats & News
                 st.divider()
-                s1, s2 = st.columns([2, 1])
-                with s1:
-                    st.subheader("📈 Price Momentum")
+                # Secondary Row: Momentum & News
+                m1, m2 = st.columns([1.5, 1])
+                with m1:
+                    st.subheader("📈 Price Momentum (3Y)")
                     st.line_chart(d['history'], height=250)
-                with s2:
-                    st.subheader("📰 Market Intelligence")
+                with m2:
+                    st.subheader("📰 Combined Insights")
                     for n in d['news']:
-                        st.caption(f"**{n.get('publisher')}**")
-                        st.write(n.get('title'))
+                        st.caption(f"**{n.get('publisher','N/A')}**")
+                        st.write(n.get('title','N/A'))
                         st.divider()
     else:
-        st.error("ไม่พบข้อมูล Ticker ที่ระบุ กรุณาลองใหม่อีกครั้ง")
+        st.error("❌ ไม่พบข้อมูลสำหรับ Ticker ที่ระบุ หรือการเชื่อมต่อฐานข้อมูลขัดข้อง")
