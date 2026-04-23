@@ -10,23 +10,23 @@ import time
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE MODERN & MINIMALIST UI ---
+# --- CSS: MODERN UI & INTELLIGENCE BOX TABS ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
     
-    /* 🟢 Modern Tabs: เปลี่ยนเป็นแถบขีดสีเขียวด้านล่างเพื่อให้ดูทันสมัย */
-    .stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 24px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    /* 🟢 คืนค่า Intelligence Center ให้เป็นกรอบสวยเหมือนเดิม */
+    .stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 8px; border: none; }
     .stTabs [data-baseweb="tab"] { 
-        background-color: transparent; 
-        border: none; padding: 12px 0px; color: #8b949e; 
-        transition: all 0.3s ease;
+        background-color: rgba(255, 255, 255, 0.05); 
+        border-radius: 4px; padding: 10px 20px; color: #8b949e; border: none;
+        transition: all 0.2s ease;
     }
     .stTabs [aria-selected="true"] { 
-        background-color: transparent !important; 
-        color: #00ff88 !important; /* เขียวนีออน */
-        border-bottom: 3px solid #00ff88 !important; /* ขีดเส้นใต้ */
+        background-color: #2ea043 !important; /* กรอบสีเขียวทึบ */
+        color: white !important; 
         font-weight: bold;
+        box-shadow: 0 4px 12px rgba(46, 160, 67, 0.3);
     }
 
     /* 💡 หุ้นเด่นวันนี้ในกรอบเดียว */
@@ -124,7 +124,7 @@ else:
         for i, (symbol, d) in enumerate(analysis.items()):
             cols[i].metric(f"💎 {symbol}", f"{d['price']:,.2f}", delta=f"C-Beta: {d['c_beta']:.3f}")
 
-        # Modern Tabs Layout
+        #Intelligence Box Tabs Layout
         tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
