@@ -32,6 +32,7 @@ st.markdown("""
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("⚖️ Portfolio Intelligence")
+    st.write(" กรุณากรองชื่อหุ้น หรือ กองทุนที่ต้องการ")
     t1 = st.text_input("Asset 1", "PTT.BK")
     t2 = st.text_input("Asset 2", "EA.BK")
     t3 = st.text_input("Asset 3", "")
