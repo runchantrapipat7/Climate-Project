@@ -9,7 +9,7 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE MODERN UI & FIXED SINGLE BOX (NO ERROR) ---
+# --- CSS: ULTIMATE MODERN UI & GLASSMORPHISM ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -26,65 +26,31 @@ st.markdown("""
 
     /* 💡 หุ้นเด่นวันนี้ ดีไซน์กรอบเดียวแบบสมบูรณ์ */
     .top-pick-container {
-        border: 1px solid #2ea043;
-        border-radius: 12px;
-        padding: 15px;
-        background: rgba(46, 160, 67, 0.08);
-        box-shadow: 0 0 15px rgba(46, 160, 67, 0.15);
+        border: 1px solid #2ea043; border-radius: 12px; padding: 15px;
+        background: rgba(46, 160, 67, 0.08); box-shadow: 0 0 15px rgba(46, 160, 67, 0.15);
         margin-bottom: 25px;
     }
-    .top-pick-header-box {
-        padding-bottom: 12px;
-        margin-bottom: 15px;
-        text-align: center;
-        border-bottom: 1px solid rgba(46, 160, 67, 0.3);
-    }
-    .top-pick-title {
-        color: #00ff88;
-        font-weight: bold;
-        font-size: 1.05rem;
-        margin: 0;
-    }
-    .top-pick-item {
-        font-size: 0.88rem;
-        font-weight: bold;
-        margin-bottom: 12px;
-        color: white;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .active-vol-label {
-        color: #8b949e;
-        font-weight: normal;
-        font-size: 0.72rem;
-    }
-    .top-pick-subtext {
-        font-size: 0.7rem;
-        color: #8b949e;
-        margin-top: 15px;
-        text-align: center;
-        opacity: 0.8;
-    }
+    .top-pick-header-box { padding-bottom: 12px; margin-bottom: 15px; text-align: center; border-bottom: 1px solid rgba(46, 160, 67, 0.3); }
+    .top-pick-title { color: #00ff88; font-weight: bold; font-size: 1.05rem; margin: 0; }
+    .top-pick-item { font-size: 0.88rem; font-weight: bold; margin-bottom: 12px; color: white; display: flex; justify-content: space-between; align-items: center; }
+    .active-vol-label { color: #8b949e; font-weight: normal; font-size: 0.72rem; }
+    .top-pick-subtext { font-size: 0.7rem; color: #8b949e; margin-top: 15px; text-align: center; opacity: 0.8; }
 
-    /* อื่นๆ */
-    div[data-testid="stMetric"] {
-        background: rgba(255, 255, 255, 0.03) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 12px; padding: 15px;
-    }
+    /* การ์ดสถิติและข้อมูล */
+    div[data-testid="stMetric"] { background: rgba(255, 255, 255, 0.03) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; }
     .insight-card { background: rgba(0, 255, 136, 0.05); border-left: 4px solid #00ff88; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem; }
     .risk-card { background: rgba(255, 75, 75, 0.05); border-left: 4px solid #ff4b4b; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem; }
     .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
     .stats-table td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
     .stats-label { color: #8b949e; }
     .stats-value { text-align: right; font-weight: bold; color: #ffffff; }
+    
     .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: rgba(13, 17, 23, 0.95); color: #8b949e; text-align: center; padding: 10px; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999; }
     .block-container { padding-bottom: 80px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- DYNAMIC TOP PICKS ENGINE (5 STOCKS) ---
+# --- DYNAMIC TOP PICKS ENGINE ---
 @st.cache_data(ttl=3600)
 def get_real_top_picks_5():
     candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
@@ -93,8 +59,7 @@ def get_real_top_picks_5():
         try:
             ticker = yf.Ticker(t)
             data = ticker.history(period="1d")
-            if not data.empty:
-                picks.append({"symbol": t, "volume": data['Volume'].iloc[-1]})
+            if not data.empty: picks.append({"symbol": t, "volume": data['Volume'].iloc[-1]})
         except: continue
     return sorted(picks, key=lambda x: x['volume'], reverse=True)[:5]
 
@@ -102,25 +67,10 @@ def get_real_top_picks_5():
 with st.sidebar:
     st.title("🛡️ Risk Controller")
     
-    # 💡 แก้ไข Error: ใช้ f-string และระมัดระวังการปิด Tag
+    # 💡 หุ้นเด่นวันนี้ (Fixed HTML)
     top_stocks = get_real_top_picks_5()
-    
-    content_html = ""
-    if top_stocks:
-        for stock in top_stocks:
-            content_html += f'<div class="top-pick-item"><span>{stock["symbol"]}</span><span class="active-vol-label">Active Vol.</span></div>'
-    
-    # รวม HTML ทั้งหมดเข้าด้วยกัน
-    full_widget_html = f"""
-    <div class="top-pick-container">
-        <div class="top-pick-header-box">
-            <p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p>
-        </div>
-        {content_html}
-        <div class="top-pick-subtext">อัปเดตข้อมูลจาก Yahoo Finance รายวัน</div>
-    </div>
-    """
-    st.sidebar.markdown(full_widget_html, unsafe_allow_html=True)
+    stocks_html = "".join([f'<div class="top-pick-item"><span>{s["symbol"]}</span><span class="active-vol-label">Active Vol.</span></div>' for s in top_stocks])
+    st.markdown(f'<div class="top-pick-container"><div class="top-pick-header-box"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p></div>{stocks_html}<div class="top-pick-subtext">อัปเดตข้อมูลจาก Yahoo Finance รายวัน</div></div>', unsafe_allow_html=True)
 
     with st.expander("🔍 ระบุชื่อหุ้นหรือกองทุน (Stock or Bond)", expanded=True):
         t1 = st.text_input("Asset 1", "PTT.BK")
@@ -181,50 +131,29 @@ if tickers:
             with tabs[i]:
                 # 📊 Statistics
                 st.subheader(f"📊 Market Summary: {symbol}")
-                inf = d['info']
+                inf = d.get('info', {})
                 s1, s2 = st.columns(2)
                 def fmt(key, style="{:,.2f}"):
                     val = inf.get(key)
                     return style.format(val) if val is not None else "N/A"
                 with s1:
-                    st.markdown(f"""<table class="stats-table">
-                        <tr><td class="stats-label">Market Cap</td><td class="stats-value">{fmt('marketCap', "{:,.0f}")}</td></tr>
-                        <tr><td class="stats-label">Trailing P/E</td><td class="stats-value">{fmt('trailingPE')}</td></tr>
-                        <tr><td class="stats-label">Beta (5Y Monthly)</td><td class="stats-value">{fmt('beta')}</td></tr>
-                    </table>""", unsafe_allow_html=True)
+                    st.markdown(f'<table class="stats-table"><tr><td class="stats-label">Market Cap</td><td class="stats-value">{fmt("marketCap", "{:,.0f}")}</td></tr><tr><td class="stats-label">Trailing P/E</td><td class="stats-value">{fmt("trailingPE")}</td></tr><tr><td class="stats-label">Beta (5Y Monthly)</td><td class="stats-value">{fmt("beta")}</td></tr></table>', unsafe_allow_html=True)
                 with s2:
-                    st.markdown(f"""<table class="stats-table">
-                        <tr><td class="stats-label">Profit Margin</td><td class="stats-value">{fmt('profitMargins', "{:.2%}")}</td></tr>
-                        <tr><td class="stats-label">Dividend Yield</td><td class="stats-value">{fmt('dividendYield', "{:.2%}")}</td></tr>
-                        <tr><td class="stats-label">Total Debt/Equity</td><td class="stats-value">{fmt('debtToEquity')}</td></tr>
-                    </table>""", unsafe_allow_html=True)
+                    st.markdown(f'<table class="stats-table"><tr><td class="stats-label">Profit Margin</td><td class="stats-value">{fmt("profitMargins", "{:.2%}")}</td></tr><tr><td class="stats-label">Dividend Yield</td><td class="stats-value">{fmt("dividendYield", "{:.2%}")}</td></tr><tr><td class="stats-label">Total Debt/Equity</td><td class="stats-value">{fmt("debtToEquity")}</td></tr></table>', unsafe_allow_html=True)
 
                 st.divider()
                 c1, c2 = st.columns(2)
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
-                    
-                    # 💡 แก้ไข: นำค่า multiplier มาคำนวณเพื่อให้เข็มขยับตาม Sidebar
-                    # tax_multiplier จะถูกกำหนดจาก Scenario ที่เลือก (Net Zero=1.5, Delayed=1.0, Current=0.5)
-                    adjusted_risk_score = d['carbon_beta'] * 100 * tax_multiplier
-                    
-                    fig_gauge = go.Figure(go.Indicator(
-                        mode = "gauge+number", 
-                        value = adjusted_risk_score,
-                        gauge = {
-                            'axis': {'range': [-50, 50], 'tickcolor': "white"},
-                            'bar': {'color': "white"},
-                            'steps': [
-                                {'range': [-50, 0], 'color': '#238636'},   # Low Risk (Green)
-                                {'range': [0, 20], 'color': '#f1e05a'},    # Med Risk (Yellow)
-                                {'range': [20, 50], 'color': '#da3633'}]   # High Risk (Red)
-                        }))
-                    
-                    fig_gauge.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+                    # 💡 แก้ไข: ใช้ c_beta และคำนวณแบบ Dynamic เพื่อให้เข็มขยับ
+                    dynamic_risk = d['c_beta'] * 100 * tax_multiplier
+                    fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = dynamic_risk,
+                        gauge = {'axis': {'range': [-50, 50], 'tickcolor': "white"}, 'bar': {'color': "white"},
+                        'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
+                    fig_gauge.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
-    
-                    # แสดง Insight ที่อัปเดตตามการคำนวณใหม่
-                    st.markdown(f'<div class="risk-card"><b>Insight:</b> ค่าความเสี่ยง C-Beta ที่ปรับตาม Scenario คือ <b>{adjusted_risk_score:.2f}</b></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="risk-card"><b>Insight:</b> ค่าความเสี่ยง C-Beta ที่ปรับตาม Scenario คือ <b>{dynamic_risk:.2f}</b></div>', unsafe_allow_html=True)
+                
                 with c2:
                     st.subheader("💰 Equity Value Bridge (MB)")
                     mkt_cap_mb = float(inf.get('marketCap', 1e11))/1e6
@@ -236,6 +165,7 @@ if tickers:
                     fig_water.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
                     st.markdown(f'<div class="insight-card"><b>Insight:</b> คาดการณ์มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b></div>', unsafe_allow_html=True)
+                
                 st.divider()
                 m1, m2 = st.columns([1.5, 1])
                 with m1:
@@ -249,4 +179,4 @@ if tickers:
                             st.divider()
 
 # --- FOOTER ---
-st.markdown(f"""<div class="footer">🏛️ Sustainable Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>""", unsafe_allow_html=True)
+st.markdown(f'<div class="footer">🏛️ Sustainable Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
