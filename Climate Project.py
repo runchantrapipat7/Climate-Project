@@ -7,9 +7,9 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Climate Finance Pro", layout="wide")
+st.set_page_config(page_title="Climate Finance Intelligence", layout="wide")
 
-# --- CSS: High-End UI ---
+# --- CSS: High-End Terminal UI ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); }
@@ -19,24 +19,30 @@ st.markdown("""
         border-radius: 12px; padding: 20px;
     }
     div[data-testid="stMetricValue"] > div { color: #00ff88 !important; }
+    .stTabs [aria-selected="true"] { background: #2ea043 !important; color: white !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR ---
+# --- SIDEBAR: ALL FEATURES INCLUDED ---
 with st.sidebar:
-    st.title("🛡️ Risk Intelligence")
+    st.title("🛡️ Portfolio Risk Control")
+    
+    # 1. หัวข้อที่คุณต้องการ (คืนค่าให้แล้วครับ)
     st.header("🔍 ระบุชื่อหุ้นหรือกองทุน (Stock or Bond)")
     t1 = st.text_input("Asset 1", "PTT.BK")
     t2 = st.text_input("Asset 2", "EA.BK")
-    tickers = [t.strip().upper() for t in [t1, t2] if t.strip()]
+    t3 = st.text_input("Asset 3", "")
+    tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
     st.divider()
+    
+    # 2. Climate Scenario
     st.header("🌍 Scenario & Policy (TCFD)")
-    scenario = st.select_slider("Ambition", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
-    # ค่า Tax Multiplier สำหรับทำให้ Gauge ขยับตาม Scenario
+    scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
     tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
     tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
     
+    # 3. Physical Risk
     flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
     wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
 
@@ -76,61 +82,71 @@ def fetch_pro_data(ticker_list):
     return full_res
 
 # --- MAIN DISPLAY ---
-st.title("🏛️ CLIMATE RISK & ASSET VALUATION")
+st.title("🏛️ SUSTAINABLE FINANCE & CLIMATE RISK MODELING")
 
 if tickers:
     analysis = fetch_pro_data(tickers)
     if analysis:
-        tabs = st.tabs([f"Terminal: {s}" for s in analysis.keys()])
+        # Overview Cards
+        cols = st.columns(len(analysis))
+        for i, (symbol, d) in enumerate(analysis.items()):
+            cols[i].metric(f"💎 {symbol}", f"{d['price']:,.2f}", delta=f"C-Beta: {d['c_beta']:.3f}")
+
+        # Individual Analysis Tabs
+        tabs = st.tabs([f"Intelligence: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
                 c1, c2 = st.columns(2)
                 
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
-                    # ปรับค่าให้เข็มขยับตาม Scenario
-                    dynamic_risk = d['c_beta'] * 100 * tax_multiplier
+                    # DYNAMIC GAUGE (เชื่อมโยง Sidebar แล้ว)
+                    risk_val = d['c_beta'] * 100 * tax_multiplier
                     fig_gauge = go.Figure(go.Indicator(
-                        mode = "gauge+number", value = dynamic_risk,
+                        mode = "gauge+number", value = risk_val,
                         gauge = {
-                            'axis': {'range': [-50, 50], 'tickcolor': "white"},
+                            'axis': {'range': [-50, 50]},
                             'bar': {'color': "white"},
                             'steps': [
-                                {'range': [-50, 0], 'color': '#238636'},   # Low Risk
-                                {'range': [0, 20], 'color': '#f1e05a'},    # Med Risk
-                                {'range': [20, 50], 'color': '#da3633'}]   # High Risk
+                                {'range': [-50, 0], 'color': '#238636'},
+                                {'range': [0, 20], 'color': '#f1e05a'},
+                                {'range': [20, 50], 'color': '#da3633'}]
                         }))
-                    fig_gauge.update_layout(height=380, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
-                    st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}")
+                    fig_gauge.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+                    st.plotly_chart(fig_gauge, use_container_width=True, key=f"gauge_{symbol}")
 
                 with c2:
                     st.subheader("💰 Equity Value Bridge (MB)")
+                    # PREMIUM WATERFALL (ทันสมัยและมี Data Labels)
                     m_cap = d['info'].get('marketCap', 1e11)
                     mkt_cap_mb = float(m_cap)/1e6
-                    val_impact = (tax_price * 1000) / wacc / 1e6 # คำนวณผลกระทบจริง
+                    val_impact = (tax_price * 1000) / wacc / 1e6
                     
-                    # ดีไซน์ Waterfall แบบพรีเมียม
                     fig_water = go.Figure(go.Waterfall(
                         orientation = "v",
                         measure = ["relative", "relative", "total"],
-                        x = ["Initial Cap", "Climate Loss", "Adj. Value"],
+                        x = ["Starting Cap", "Climate Loss", "Adj. Value"],
                         y = [mkt_cap_mb, -val_impact, mkt_cap_mb - val_impact],
                         text = [f"{mkt_cap_mb:,.0f}", f"-{val_impact:,.0f}", f"{(mkt_cap_mb-val_impact):,.0f}"],
                         textposition = "outside",
-                        connector = {"line":{"color":"rgba(255,255,255,0.3)"}},
                         increasing = {"marker":{"color":"#2ea043"}},
                         decreasing = {"marker":{"color":"#da3633"}},
                         totals = {"marker":{"color":"#1f6feb"}}
                     ))
-                    fig_water.update_layout(height=380, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
-                    st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}")
+                    fig_water.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+                    st.plotly_chart(fig_water, use_container_width=True, key=f"water_{symbol}")
 
                 st.divider()
-                # Combined Insights Section
-                st.subheader("📰 Combined Insights & Analysis")
-                if d['news']:
-                    for n in d['news']:
-                        st.write(f"**[{n.get('publisher','Source')}]** {n.get('title','No Title')}")
-                        st.caption(f"[Link]({n.get('link','#')})")
-                else:
-                    st.info(f"No recent news for {symbol}. Climate Beta is {d['c_beta']:.4f}")
+                
+                # Combined Insights & Momentum
+                m1, m2 = st.columns([1.5, 1])
+                with m1:
+                    st.subheader("📈 Price Momentum (3Y)")
+                    st.line_chart(d['history'], height=250)
+                with m2:
+                    st.subheader("📰 Combined Insights")
+                    if d['news']:
+                        for n in d['news']:
+                            st.write(f"**{n.get('publisher','Source')}**: {n.get('title','No Title')}")
+                            st.divider()
+                    else: st.info(f"No recent news. Beta is {d['c_beta']:.4f}")
