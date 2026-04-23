@@ -8,128 +8,111 @@ import plotly.graph_objects as go
 from datetime import datetime
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Sustainable Finance AI", layout="wide")
+st.set_page_config(page_title="Climate Finance Intelligence", layout="wide")
 
-# --- CSS: Fixed Contrast & Professional Theme ---
+# --- CSS: High-Contrast Dashboard Style ---
 st.markdown("""
     <style>
-    [data-testid="stMetric"] {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        padding: 20px; border-radius: 15px; border: 1px solid rgba(128, 128, 128, 0.2);
+    .main { background-color: #0e1117; }
+    div[data-testid="stMetric"] {
+        background-color: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 15px; border-radius: 12px;
     }
-    [data-testid="stMetricValue"] > div { color: #2ECC71 !important; }
-    .stAlert { border-radius: 15px; }
+    [data-testid="stMetricValue"] > div { color: #2ECC71 !important; font-size: 24px; }
+    .stInfo { border-radius: 15px; background-color: rgba(46, 204, 113, 0.1); border: none; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
-    asset_class = st.radio("Asset Class", ["Stock", "Mutual Fund"], horizontal=True)
-    ticker_input = st.text_input("Symbol Ticker (เช่น PTT.BK, CPALL.BK)", "PTT.BK")
+    ticker_input = st.text_input("Symbol Ticker (เช่น PTT.BK, CPALL.BK, DELTA.BK)", "PTT.BK")
     
     st.divider()
-    st.header("🌍 Scenario Analysis (TCFD)")
-    scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
+    st.header("🌍 Scenario & Policy")
+    scenario = st.select_slider("Climate Ambition", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
     tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
     
     st.divider()
     st.header("🌊 Physical Risk Score")
     flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
     drought_risk = st.slider("Drought Exposure (%)", 0, 100, 30)
+    wacc = st.slider("Discount Rate (WACC %)", 5.0, 15.0, 8.0) / 100
 
-# --- CORE LOGIC: CLIMATE MODELING ---
+# --- CORE LOGIC: DATA ENGINE ---
 @st.cache_data(ttl=3600)
-def run_full_analysis(symbol):
+def fetch_comprehensive_data(symbol):
     try:
-        # ดึงข้อมูล Ticker และตัวแทนตลาด
+        t_obj = yf.Ticker(symbol)
+        # 1. ข้อมูลราคาและ Modeling
         data = yf.download([symbol, "PTTEP.BK", "EA.BK", "^SET.BK"], start="2023-01-01", progress=False)['Close']
-        if symbol not in data.columns or data[symbol].isnull().all():
-            return None, None, None, None
-            
+        if symbol not in data.columns: return None
+        
         returns = data.pct_change().dropna()
-        # คำนวณ Carbon Beta (BMG)
         bmg = returns["PTTEP.BK"] - returns["EA.BK"]
         X = sm.add_constant(pd.DataFrame({'Market': returns["^SET.BK"], 'Carbon': bmg}))
         model = sm.OLS(returns[symbol], X).fit()
         
-        # ดึงข่าว (แยก try-except เพื่อไม่ให้แอปพังถ้าไม่มีข่าว)
-        try:
-            news = yf.Ticker(symbol).news[:5]
-        except:
-            news = []
-            
-        return model, data[symbol].iloc[-1], returns[symbol], news
-    except:
-        return None, None, None, None
+        # 2. ข้อมูลพื้นฐาน (Fundamentals)
+        info = t_obj.info
+        
+        return {
+            "model": model,
+            "last_price": data[symbol].iloc[-1],
+            "history": data[symbol],
+            "info": info,
+            "news": t_obj.news[:5]
+        }
+    except: return None
 
 # --- MAIN DISPLAY ---
-st.title("📊 Climate Risk Modeling & Sustainable Finance")
-st.markdown(f"**Strategic Market Intelligence** | Analysis Date: {datetime.now().strftime('%Y-%m-%d')}")
+st.title("🏛️ Sustainable Finance & Climate Risk Intelligence")
+st.markdown(f"**Asset Intelligence Terminal** | {ticker_input} | {datetime.now().strftime('%d %B %Y')}")
 
-model, price, hist_ret, news_data = run_full_analysis(ticker_input)
+res = fetch_comprehensive_data(ticker_input)
 
-if model:
-    carbon_beta = model.params['Carbon']
+if res:
+    info = res['info']
+    model = res['model']
+    c_beta = model.params['Carbon']
     
-    # --- ROW 1: METRICS ---
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Current Price", f"{price:,.2f} THB")
-    col2.metric("Carbon Beta", f"{carbon_beta:.3f}")
-    col3.metric("Projected Carbon Tax", f"{tax_price} / t")
-    col4.metric("Market Sensitivity", f"{model.params['Market']:.2f}")
+    # --- ROW 1: REAL-TIME FUNDAMENTALS ---
+    st.subheader("📌 Corporate Snapshot")
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Market Price", f"{res['last_price']:.2f} THB")
+    c2.metric("P/E Ratio", f"{info.get('trailingPE', 'N/A')}")
+    c3.metric("Div. Yield", f"{info.get('dividendYield', 0)*100:.2f}%")
+    c4.metric("Market Cap", f"{info.get('marketCap', 0)/1e9:.1f}B")
+    c5.metric("52W High", f"{info.get('fiftyTwoWeekHigh', 0):.2f}")
 
     st.divider()
 
-    # --- ROW 2: CHARTS ---
-    l_col, r_col = st.columns([1, 1.5])
-    with l_col:
-        st.subheader("🔥 Transition Risk Meter")
+    # --- ROW 2: PRICE MOMENTUM & CLIMATE MODELING ---
+    col_l, col_r = st.columns([2, 1])
+    
+    with col_l:
+        st.subheader("📈 1-Year Price Momentum")
+        fig_price = px.line(res['history'], color_discrete_sequence=['#2ECC71'])
+        fig_price.update_layout(xaxis_title="", yaxis_title="Price (THB)", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_price, use_container_width=True)
+    
+    with col_r:
+        st.subheader("🔥 Carbon Sensitivity")
         fig_gauge = go.Figure(go.Indicator(
-            mode = "gauge+number", value = carbon_beta * 100,
-            gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "#E74C3C" if carbon_beta > 0 else "#2ECC71"}}))
+            mode = "gauge+number", value = c_beta * 100,
+            title = {'text': "Carbon Beta Index"},
+            gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "#E74C3C" if c_beta > 0 else "#2ECC71"}}))
+        fig_gauge.update_layout(height=300, margin=dict(l=10, r=10, t=40, b=10), paper_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig_gauge, use_container_width=True)
 
-    with r_col:
-        st.subheader("📈 Physical Risk Matrix")
-        risk_df = pd.DataFrame({'Risk': ['Flood', 'Drought', 'Coastal'], 'Score': [flood_risk, drought_risk, flood_risk*0.5]})
-        st.plotly_chart(px.bar(risk_df, x='Score', y='Risk', orientation='h', color='Score', color_continuous_scale='Reds'), use_container_width=True)
-
-    # --- ROW 3: RESEARCH & NEWS ---
+    # --- ROW 3: DEEP RESEARCH & RISK ANALYSIS ---
     st.divider()
-    res_col, news_col = st.columns([1, 1])
+    res_l, res_r = st.columns([1, 1])
     
-    with res_col:
-        st.subheader("🧬 Sustainable Finance Research")
+    with res_l:
+        st.subheader("🧬 Sustainable Finance Research Memo")
+        val_impact = (tax_price * 1000) / wacc / 1e6 # Simulation
         memo = f"""
-        **Daily Analysis Summary:**
-        - **Transition Risk:** หุ้น {ticker_input} มีความอ่อนไหวต่อราคาคาร์บอนที่ {carbon_beta:.3f}
-        - **Tax Impact:** ภายใต้ฉากทัศน์ {scenario} คาดว่าจะได้รับผลกระทบจากภาษีคาร์บอน {tax_price} บาท/ตัน
-        - **Physical Risk:** พื้นที่ลุ่มน้ำเจ้าพระยา (GDP 50% ของประเทศ) เสี่ยงต่อน้ำท่วมสูงถึง 95% ของภัยพิบัติทั้งหมด
-        """
-        st.info(memo)
-        
-        # Waterfall Valuation
-        val_impact = (tax_price * 500) / 0.08 / 1e6
-        fig_water = go.Figure(go.Waterfall(x=["Cap", "Climate Loss", "Adjusted"], y=[1000, -val_impact, 1000-val_impact], measure=["relative", "relative", "total"]))
-        st.plotly_chart(fig_water, use_container_width=True)
-
-    with news_col:
-        st.subheader("📰 Daily Market Intelligence")
-        if news_data:
-            for n in news_data:
-                # แก้ไขการดึงข้อมูลโดยใช้ .get() เพื่อป้องกัน KeyError
-                title = n.get('title', 'No Title Available')
-                publisher = n.get('publisher', 'Unknown Source')
-                link = n.get('link', '#')
-                
-                st.write(f"**[{publisher}]** - {title}")
-                st.write(f"[อ่านข่าวเต็ม]({link})")
-                st.caption("Climate Sentiment Analysis: ESG Integrated")
-                st.divider()
-        else:
-            st.warning("⚠️ ไม่พบข้อมูลข่าวสารล่าสุดในระบบ Ticker ของ Yahoo Finance")
-
-else:
-    st.error(f"❌ ไม่พบข้อมูลสำหรับ Ticker: {ticker_input}")
-    st.info("💡 **คำแนะนำ:** ตลาดหุ้นไทยต้องลงท้ายด้วย .BK (เช่น PTT.BK) / หากเป็นกองทุนให้ใช้ดัชนีตัวแทน เช่น ^GSPC (S&P 500)")
+        **วิเคราะห์พื้นฐานรายวัน:**
+        บริษัท {info.get('longName', ticker_input)} ดำเนินธุรกิจในกลุ่ม {info.get('sector', 'N/A')}
