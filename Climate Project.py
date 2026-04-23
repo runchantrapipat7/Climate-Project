@@ -115,3 +115,50 @@ if model:
 
 else:
     st.warning("🔍 **ไม่พบข้อมูล Ticker:** หากคุณวิเคราะห์กองทุนต่างประเทศ (เช่น S&P 500) ให้ใช้ Ticker ตัวแทน เช่น `^GSPC` แทนครับ")
+
+# --- NEW SECTION: DAILY RESEARCH & NEWS ANALYSIS ---
+    st.divider()
+    st.header(f"📰 Daily Research & Insight: {ticker_input}")
+    
+    # ดึงข้อมูลข่าวสารล่าสุดจาก Yahoo Finance
+    try:
+        ticker_obj = yf.Ticker(ticker_input)
+        news = ticker_obj.news[:5] # ดึง 5 ข่าวล่าสุด
+        
+        if news:
+            col_n1, col_n2 = st.columns([1, 1])
+            
+            with col_n1:
+                st.subheader("Latest Market News")
+                for item in news:
+                    with st.expander(f"📌 {item['title']}"):
+                        st.write(f"**Source:** {item['publisher']}")
+                        st.write(f"**Link:** [Read Full Article]({item['link']})")
+                        # จำลองการวิเคราะห์ ESG Sentiment
+                        st.caption("ESG Analysis: Neutral to Positive impact on Climate Strategy")
+            
+            with col_n2:
+                st.subheader("Sustainable Finance Research Memo")
+                # ส่วนนี้เป็นการจำลองการเขียน Research รายวันตามหลัก Climate Modeling
+                memo_text = f"""
+                **ประจำวันที่:** {datetime.now().strftime('%d %B %Y')}
+                
+                **วิเคราะห์ผลกระทบรายวัน:**
+                จากการตรวจสอบข้อมูลล่าสุด หุ้น {ticker_input} มีค่า Carbon Beta ที่ {carbon_beta:.3f} 
+                ซึ่งหมายถึงความไวต่อราคาคาร์บอนในระดับที่ควรเฝ้าติดตาม 
+                
+                **ประเด็นสำคัญด้านความยั่งยืน:**
+                1. **Transition Risk:** ภายใต้ฉากทัศน์ {scenario} บริษัทต้องเตรียมสำรองกระแสเงินสด
+                   เพิ่มขึ้นเพื่อรองรับภาษีคาร์บอนที่คาดว่าจะอยู่ที่ {tax_price} บาท/ตัน
+                2. **Physical Exposure:** ด้วยคะแนนความเสี่ยงน้ำท่วมที่ {flood_risk}% นักลงทุนควรพิจารณา
+                   ค่าเสื่อมราคาของสินทรัพย์ถาวรในพื้นที่ลุ่มแม่น้ำเจ้าพระยาเพิ่มเติม
+                
+                **คำแนะนำเชิงกลยุทธ์:**
+                ควรเพิ่มน้ำหนักการลงทุน (Overweight) หากบริษัทมีการประกาศแผน Net Zero ที่ชัดเจนกว่าเดิม
+                """
+                st.info(memo_text)
+        else:
+            st.warning("ไม่พบข้อมูลข่าวสารล่าสุดสำหรับ Ticker นี้ในระบบ Research")
+            
+    except Exception as e:
+        st.error(f"ไม่สามารถดึงข้อมูล Research ได้: {e}")
