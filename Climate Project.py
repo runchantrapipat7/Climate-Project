@@ -9,7 +9,7 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Intelligence Pro", layout="wide")
 
-# --- CSS: ULTIMATE DARK MODE & SIDEBAR STYLING ---
+# --- CSS: ULTIMATE DARK MODE, SIDEBAR & FOOTER STYLING ---
 st.markdown("""
     <style>
     /* Main Background */
@@ -48,33 +48,38 @@ st.markdown("""
         padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem;
     }
     
-    /* Slider Color Customization */
-    .stSlider [data-baseweb="slider"] { margin-bottom: 25px; }
-    
-    /* Tabs Customization */
-    .stTabs [aria-selected="true"] { 
-        background: linear-gradient(90deg, #2ea043, #238636) !important; 
-        color: white !important; 
-        border-radius: 8px !important;
+    /* Footer Styling */
+    .footer {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        background-color: rgba(13, 17, 23, 0.9);
+        color: #8b949e;
+        text-align: center;
+        padding: 10px;
+        font-size: 0.8rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        z-index: 999;
     }
+    
+    /* Adjust main content for footer space */
+    .block-container { padding-bottom: 60px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SIDEBAR: MODERN INPUT SELECTION ---
+# --- SIDEBAR: MODERN SELECTION ---
 with st.sidebar:
-    st.image("https://www.tcfdhub.org/wp-content/uploads/2021/07/tcfd_logo_header.png", width=150)
     st.title("🛡️ Risk Controller")
     
     with st.expander("🔍 Asset Selection", expanded=True):
-        st.write("กรุณาระบุหุ้นที่ต้องการวิเคราะห์")
-        t1 = st.text_input("Asset 1 (Primary)", "PTT.BK")
+        t1 = st.text_input("Asset 1", "PTT.BK")
         t2 = st.text_input("Asset 2", "EA.BK")
         t3 = st.text_input("Asset 3", "")
     
     st.divider()
     
     with st.expander("🌍 Climate Scenarios", expanded=True):
-        st.write("เลือกระดับความเข้มข้นของนโยบาย")
         scenario = st.select_slider(
             "Ambition Level", 
             options=["Net Zero 2050", "Delayed Transition", "Current Policy"],
@@ -86,8 +91,8 @@ with st.sidebar:
     st.divider()
     
     with st.expander("⚙️ Advanced Parameters", expanded=True):
-        flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45, help="ความเสี่ยงจากภัยน้ำท่วมในพื้นที่ตั้งโรงงาน")
-        wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0, help="อัตราคิดลดสำหรับประเมินมูลค่ากิจการ") / 100
+        flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
+        wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
 
     tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
@@ -159,11 +164,9 @@ if tickers:
                     fig_gauge.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
                     
-                    # --- Summary Box Under Gauge ---
                     risk_st = "High" if risk_score > 20 else "Moderate" if risk_score > 0 else "Low"
                     st.markdown(f"""<div class="risk-card">
-                        <b>Transition Insight:</b> ระดับความเสี่ยง <b>{risk_st}</b> 
-                        (Score: {risk_score:.2f}) ภายใต้ฉากทัศน์ {scenario}
+                        <b>Transition Insight:</b> ระดับความเสี่ยง <b>{risk_st}</b> ภายใต้ฉากทัศน์ {scenario}
                         </div>""", unsafe_allow_html=True)
 
                 with c2:
@@ -187,17 +190,14 @@ if tickers:
                     fig_water.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
                     
-                    # --- Summary Box Under Waterfall ---
                     st.markdown(f"""<div class="insight-card">
-                        <b>Valuation Insight:</b> คาดการณ์มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b> 
-                        ({-(val_impact/mkt_cap_mb)*100:.2f}%) จากผลกระทบ Carbon Tax
+                        <b>Valuation Insight:</b> คาดการณ์มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b> จากผลกระทบของ Climate Risk
                         </div>""", unsafe_allow_html=True)
 
                 st.divider()
-                # Momentum & News
                 m1, m2 = st.columns([1.5, 1])
                 with m1:
-                    st.subheader("📈 Price Momentum (3Y)")
+                    st.subheader("📈 Price Momentum")
                     st.line_chart(d['history'], height=250)
                 with m2:
                     st.subheader("📰 Combined Insights")
@@ -205,4 +205,10 @@ if tickers:
                         for n in d['news']:
                             st.write(f"**{n.get('publisher','Source')}**: {n.get('title','No Title')}")
                             st.divider()
-                    else: st.info("No recent news for this asset.")
+
+# --- FOOTER: PRESENTED BY RUN CHANTRAPIPAT ---
+st.markdown("""
+    <div class="footer">
+        🏛️ Sustainable Finance Intelligence Terminal | <b>Presented by Run Chantrapipat</b> | © 2026
+    </div>
+    """, unsafe_allow_html=True)
