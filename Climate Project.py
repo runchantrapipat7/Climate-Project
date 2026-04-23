@@ -102,3 +102,29 @@ if model:
     with res_col:
         st.subheader("🧬 Sustainable Finance Research")
         memo = f"""
+        **Daily Analysis Summary:**
+        - **Transition Risk:** หุ้น {ticker_input} มีความอ่อนไหวต่อราคาคาร์บอนที่ {carbon_beta:.3f}
+        - **Tax Impact:** ภายใต้ฉากทัศน์ {scenario} คาดว่าจะได้รับผลกระทบจากภาษีคาร์บอน {tax_price} บาท/ตัน
+        - **Physical Risk:** พื้นที่ลุ่มน้ำเจ้าพระยา (GDP 50% ของประเทศ) เสี่ยงต่อน้ำท่วมสูงถึง 95% ของภัยพิบัติทั้งหมด
+        """
+        st.info(memo)
+        
+        # Waterfall Valuation
+        val_impact = (tax_price * 500) / 0.08 / 1e6
+        fig_water = go.Figure(go.Waterfall(x=["Cap", "Climate Loss", "Adjusted"], y=[1000, -val_impact, 1000-val_impact], measure=["relative", "relative", "total"]))
+        st.plotly_chart(fig_water, use_container_width=True)
+
+    with news_col:
+        st.subheader("📰 Daily Market Intelligence")
+        if news_data:
+            for n in news_data:
+                st.write(f"**[{n['publisher']}]** - {n['title']}")
+                st.write(f"[อ่านข่าวเต็ม]({n['link']})")
+                st.caption("Climate Sentiment: ESG Integrated Analysis")
+                st.divider()
+        else:
+            st.warning("⚠️ ไม่พบข่าวสารล่าสุดในระบบ Ticker ของ Yahoo Finance")
+
+else:
+    st.error(f"❌ ไม่พบข้อมูลสำหรับ Ticker: {ticker_input}")
+    st.info("💡 **คำแนะนำ:** ตลาดหุ้นไทยต้องลงท้ายด้วย .BK (เช่น PTT.BK) / หากเป็นกองทุนให้ใช้ดัชนีตัวแทน เช่น ^GSPC (S&P 500)")
