@@ -9,66 +9,120 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: MODERN UI, GREEN TABS & DYNAMIC POP-UP ---
+# --- CSS: ULTIMATE MODERN UI & NEON TOP PICKS ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
-    .stTabs [data-baseweb="tab"] { background-color: rgba(255, 255, 255, 0.05); border-radius: 4px; padding: 10px 25px; color: #8b949e; border: none; }
-    .stTabs [aria-selected="true"] { background-color: #2ea043 !important; color: white !important; font-weight: bold; }
-    .top-pick-box { background: rgba(46, 160, 67, 0.1); border: 1px solid #2ea043; border-radius: 15px; padding: 15px; box-shadow: 0 0 20px rgba(46, 160, 67, 0.2); margin-bottom: 20px; }
-    div[data-testid="stMetric"] { background: rgba(255, 255, 255, 0.03) !important; border: 1px solid rgba(255, 255, 255, 0.08) !important; border-radius: 12px; padding: 15px; }
+    
+    /* 🟢 แถบสีเขียวสำหรับ Tab ที่เลือก */
+    .stTabs [data-baseweb="tab-list"] { background-color: transparent; gap: 10px; }
+    .stTabs [data-baseweb="tab"] { 
+        background-color: rgba(255, 255, 255, 0.05); 
+        border-radius: 4px; padding: 10px 25px; color: #8b949e; border: none;
+    }
+    .stTabs [aria-selected="true"] { 
+        background-color: #2ea043 !important; color: white !important; font-weight: bold;
+    }
+
+    /* 💡 หุ้นเด่นวันนี้ ดีไซน์ตามรูปภาพ */
+    .top-pick-header {
+        border: 1px solid #2ea043;
+        border-radius: 12px;
+        padding: 10px;
+        text-align: center;
+        background: rgba(46, 160, 67, 0.05);
+        box-shadow: 0 0 10px rgba(46, 160, 67, 0.2);
+        margin-bottom: 20px;
+    }
+    .top-pick-title {
+        color: #00ff88;
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin: 0;
+    }
+    .top-pick-item {
+        font-size: 0.9rem;
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: white;
+    }
+    .top-pick-sub {
+        font-size: 0.75rem;
+        color: #8b949e;
+        margin-top: 15px;
+    }
+
+    /* สไตล์ Metrics และ Cards */
+    div[data-testid="stMetric"] {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 12px; padding: 15px;
+    }
     .insight-card { background: rgba(0, 255, 136, 0.05); border-left: 4px solid #00ff88; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem; }
     .risk-card { background: rgba(255, 75, 75, 0.05); border-left: 4px solid #ff4b4b; padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 0.9rem; }
+
+    /* ตารางสถิติ */
     .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
     .stats-table td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
     .stats-label { color: #8b949e; }
     .stats-value { text-align: right; font-weight: bold; color: #ffffff; }
-    .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: rgba(13, 17, 23, 0.95); color: #8b949e; text-align: center; padding: 10px; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999; }
+
+    /* Footer */
+    .footer {
+        position: fixed; left: 0; bottom: 0; width: 100%;
+        background-color: rgba(13, 17, 23, 0.95); color: #8b949e;
+        text-align: center; padding: 10px; font-size: 0.8rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999;
+    }
     .block-container { padding-bottom: 80px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- DYNAMIC TOP PICKS FROM YFINANCE ---
+# --- DYNAMIC TOP PICKS ENGINE ---
 @st.cache_data(ttl=3600)
 def get_real_top_picks():
-    # ดึงข้อมูลหุ้นที่มี Volume สูงสุดเพื่อหาหุ้นเด่น
-    tickers_to_watch = ["PTT.BK", "CPALL.BK", "AOT.BK", "EA.BK", "KBANK.BK", "ADVANC.BK"]
+    # รายชื่อหุ้นที่มีโอกาสเป็นผู้นำตลาด
+    candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK"]
     picks = []
-    for t in tickers_to_watch:
+    for t in candidate_tickers:
         try:
-            d = yf.Ticker(t).history(period="1d")
-            if not d.empty:
-                picks.append({"symbol": t, "vol": d['Volume'].iloc[-1]})
+            ticker = yf.Ticker(t)
+            data = ticker.history(period="1d")
+            if not data.empty:
+                picks.append({"symbol": t, "volume": data['Volume'].iloc[-1]})
         except: continue
-    # เรียงลำดับตาม Volume และเลือก 2 อันดับแรก
-    sorted_picks = sorted(picks, key=lambda x: x['vol'], reverse=True)[:2]
-    return sorted_picks
+    # เรียงลำดับตามปริมาณการซื้อขายสูงสุด
+    return sorted(picks, key=lambda x: x['volume'], reverse=True)[:2]
 
-# --- SIDEBAR ---
+# --- SIDEBAR: PRESERVED & STYLED ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
+    
     with st.expander("🔍 ระบุชื่อหุ้นหรือกองทุน (Stock or Bond)", expanded=True):
         t1 = st.text_input("Asset 1", "PTT.BK")
         t2 = st.text_input("Asset 2", "EA.BK")
         t3 = st.text_input("Asset 3", "TPIPP.BK")
     
     st.divider()
+    
     with st.expander("🌍 Scenario & Policy (TCFD)", expanded=True):
         scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
         tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
         tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
     
     st.divider()
+    
     with st.expander("⚙️ Advanced Parameters", expanded=True):
         flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
         wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
 
-    # 💡 แก้ไข: หุ้นเด่นวันนี้ ดึงข้อมูลจริงจาก yfinance
+    # 💡 หุ้นเด่นวันนี้ ดีไซน์ตามรูปภาพที่คุณส่งมา
     top_stocks = get_real_top_picks()
-    st.markdown('<div class="top-pick-box"><h4 style="color: #00ff88; margin-top:0;">🌟 หุ้นเด่นวันนี้ (Real-time)</h4>', unsafe_allow_html=True)
-    for stock in top_stocks:
-        st.markdown(f'<p style="font-size: 0.85rem; margin-bottom: 5px;"><b>{stock["symbol"]}</b> (Active Volume)</p>', unsafe_allow_html=True)
-    st.markdown('<p style="font-size: 0.75rem; color: #8b949e;">อัปเดตข้อมูลจาก Yahoo Finance รายวัน</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="top-pick-header"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p></div>', unsafe_allow_html=True)
+    if top_stocks:
+        for stock in top_stocks:
+            st.markdown(f'<div class="top-pick-item">{stock["symbol"]} (Active Volume)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="top-pick-sub">อัปเดตข้อมูลจาก Yahoo Finance รายวัน</div>', unsafe_allow_html=True)
 
     tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
@@ -111,6 +165,7 @@ if tickers:
         tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
+                # 📊 Statistics
                 st.subheader(f"📊 Market Summary: {symbol}")
                 inf = d['info']
                 s1, s2 = st.columns(2)
@@ -136,7 +191,7 @@ if tickers:
                     st.subheader("🔥 Transition Risk Sensitivity")
                     risk_score = d['c_beta'] * 100 * tax_multiplier
                     fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = risk_score,
-                        gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "white"},
+                        gauge = {'axis': {'range': [-50, 50], 'tickcolor': "white"}, 'bar': {'color': "white"},
                         'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
                     fig_gauge.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
@@ -151,7 +206,7 @@ if tickers:
                         increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
                     fig_water.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
-                    st.markdown(f'<div class="insight-card"><b>Insight:</b> มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="insight-card"><b>Insight:</b> คาดการณ์มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b></div>', unsafe_allow_html=True)
                 st.divider()
                 m1, m2 = st.columns([1.5, 1])
                 with m1:
