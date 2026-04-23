@@ -9,29 +9,18 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE MODERN UI & TERMINAL LOG ---
+# --- CSS: MODERN UI & TERMINAL LOG ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
     .stTabs [aria-selected="true"] { background-color: #2ea043 !important; color: white !important; font-weight: bold; }
     
-    /* 💡 หุ้นเด่นวันนี้ในกรอบเดียว */
     .top-pick-container { border: 1px solid #2ea043; border-radius: 12px; padding: 15px; background: rgba(46, 160, 67, 0.08); box-shadow: 0 0 15px rgba(46, 160, 67, 0.15); margin-bottom: 25px; }
     .top-pick-title { color: #00ff88; font-weight: bold; font-size: 1.05rem; margin: 0; text-align: center; border-bottom: 1px solid rgba(46,160,67,0.3); padding-bottom: 10px; margin-bottom: 15px; }
     .top-pick-item { font-size: 0.88rem; font-weight: bold; margin-bottom: 12px; color: white; display: flex; justify-content: space-between; }
     
-    /* 📟 Terminal Log Style (ยกขึ้นมาไว้ด้านบน) */
-    .log-container { 
-        background: #000000; 
-        border: 1px solid #2ea043; 
-        border-radius: 10px; 
-        padding: 20px; 
-        font-family: 'Courier New', Courier, monospace;
-        margin-top: 20px;
-        margin-bottom: 30px;
-        box-shadow: inset 0 0 10px #2ea04333;
-    }
-    .log-entry { color: #00ff88; font-size: 0.9rem; margin-bottom: 8px; line-height: 1.4; }
+    .log-container { background: #000000; border: 1px solid #2ea043; border-radius: 10px; padding: 20px; font-family: 'Courier New', Courier, monospace; margin-bottom: 30px; box-shadow: inset 0 0 10px #2ea04333; }
+    .log-entry { color: #00ff88; font-size: 0.9rem; margin-bottom: 8px; }
     .log-entry span { color: #8b949e; }
 
     .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
@@ -65,7 +54,7 @@ with st.sidebar:
     with st.expander("🔍 Asset Selection", expanded=True):
         t1 = st.text_input("Asset 1", "PTT.BK")
         t2 = st.text_input("Asset 2", "EA.BK")
-        t3 = st.text_input("Asset 3", "TPIPP.BK")
+        t3 = st.text_input("Asset 3", "")
     
     st.divider()
     with st.expander("🌍 Scenario Policy (TCFD)", expanded=True):
@@ -75,8 +64,8 @@ with st.sidebar:
     
     st.divider()
     with st.expander("⚙️ Physical Risk Parameters", expanded=True):
-        flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
-        wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
+        flood_risk = st.slider("Flood Exposure (%)", 0, 100, 35)
+        wacc = st.slider("WACC (%)", 5.0, 20.0, 12.69) / 100
 
     tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
@@ -85,6 +74,7 @@ with st.sidebar:
 def fetch_pro_data(ticker_list):
     full_res = {}
     try:
+        # Benchmark for Carbon Beta
         proxies = yf.download(["PTTEP.BK", "EA.BK", "^SET.BK"], period="3y", progress=False)['Close']
         proxies = proxies.ffill().bfill()
     except: proxies = pd.DataFrame()
@@ -109,9 +99,14 @@ def fetch_pro_data(ticker_list):
 # --- MAIN DISPLAY ---
 st.title("🏛️ SUSTAINABLE FINANCE ASSET TERMINAL")
 
-if tickers:
+if not tickers:
+    st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้นการวิเคราะห์")
+else:
     analysis = fetch_pro_data(tickers)
-    if analysis:
+    if not analysis:
+        st.error("❌ ไม่สามารถดึงข้อมูลได้ โปรดตรวจสอบชื่อหุ้นหรือการเชื่อมต่ออินเทอร์เน็ต")
+    else:
+        # Overview Cards
         cols = st.columns(len(analysis))
         for i, (symbol, d) in enumerate(analysis.items()):
             cols[i].metric(f"💎 {symbol}", f"{d['price']:,.2f}", delta=f"C-Beta: {d['c_beta']:.3f}")
@@ -119,7 +114,7 @@ if tickers:
         tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
-                # 📊 Statistics
+                # 📊 Market Stats
                 st.subheader(f"📊 Market Summary: {symbol}")
                 inf = d.get('info', {})
                 s1, s2 = st.columns(2)
@@ -127,7 +122,7 @@ if tickers:
                     val = inf.get(key)
                     return style.format(val) if val is not None else "N/A"
                 with s1:
-                    st.markdown(f'<table class="stats-table"><tr><td class="stats-label">Market Cap</td><td class="stats-value">{fmt("marketCap", "{:,.0f}")}</td></tr><tr><td class="stats-label">Trailing P/E</td><td class="stats-value">{fmt("trailingPE")}</td></tr><tr><td class="stats-label">Beta (5Y Monthly)</td><td class="stats-value">{fmt("beta")}</td></tr></table>', unsafe_allow_html=True)
+                    st.markdown(f'<table class="stats-table"><tr><td class="stats-label">Market Cap</td><td class="stats-value">{fmt("marketCap", "{:,.0f}")}</td></tr><tr><td class="stats-label">Trailing P/E</td><td class="stats-value">{fmt("trailingPE")}</td></tr><tr><td class="stats-label">Beta (5Y)</td><td class="stats-value">{fmt("beta")}</td></tr></table>', unsafe_allow_html=True)
                 with s2:
                     st.markdown(f'<table class="stats-table"><tr><td class="stats-label">Profit Margin</td><td class="stats-value">{fmt("profitMargins", "{:.2%}")}</td></tr><tr><td class="stats-label">Dividend Yield</td><td class="stats-value">{fmt("dividendYield", "{:.2%}")}</td></tr><tr><td class="stats-label">Debt/Equity</td><td class="stats-value">{fmt("debtToEquity")}</td></tr></table>', unsafe_allow_html=True)
 
@@ -145,14 +140,13 @@ if tickers:
                 r3.info(f"💧 Liquidity: Low")
                 r4.success(f"⚖️ Liability: Low")
 
-                # 📝 ตู้นี้คือ LOG ที่คุณตามหาครับ! (ยกขึ้นมาไว้บนสุดของกราฟ)
+                # 📟 Terminal Log
                 st.markdown(f"""
                 <div class="log-container">
-                    <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > SYSTEM_ANALYSIS: Executing {symbol} Climate Stress Test...</div>
-                    <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > TRANSITION_MODEL: Policy Ambition set to "{scenario}" (Tax Mult: {tax_multiplier})</div>
-                    <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > PHYSICAL_MODEL: Flood Exposure Impact set to {flood_risk}%</div>
-                    <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > CREDIT_CHECK: Debt-to-Equity verified at {fmt("debtToEquity")}. Risk Status: {credit_risk}</div>
-                    <div class="log-entry" style="color:#ffffff; font-weight:bold;"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STATUS: OK. All charts updated.</div>
+                    <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > SYSTEM: Analyzing {symbol} Climate Stress...</div>
+                    <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > TRANSITION: Mode "{scenario}" (Multiplier: {tax_multiplier})</div>
+                    <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > PHYSICAL: Flood Exposure {flood_risk}% | WACC {wacc*100:.2f}%</div>
+                    <div class="log-entry" style="color:#ffffff;"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STATUS: OK. Dashboard Repainted.</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -161,11 +155,13 @@ if tickers:
                 c1, c2 = st.columns(2)
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
+                    # FIX: เข็มขยับแน่นอน
                     fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = dynamic_trans,
                         gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "white"},
                         'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
                     fig_gauge.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=0, b=0))
                     st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
+                
                 with c2:
                     st.subheader("💰 Equity Value Bridge (MB)")
                     mkt_cap_mb = float(inf.get('marketCap', 1e11))/1e6
