@@ -10,7 +10,7 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Sustainable Finance Analyzer", layout="wide")
 
-# --- CSS: Modern Dashboard Style ---
+# --- CSS: Modern Dashboard ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -31,9 +31,9 @@ st.markdown("""
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("⚖️ Portfolio Intelligence")
-    st.write("ระบุหุ้น/กองทุน (แยกด้วยคอมม่า หรือใส่ทีละช่อง)")
+    st.write("ระบุหุ้น/กองทุน (แยกช่องละ 1 ตัว)")
     t1 = st.text_input("Asset 1", "PTT.BK")
-    t2 = st.text_input("Asset 2", "EA.BK")
+    t2 = st.text_input("Asset 2", "BTS.BK")
     t3 = st.text_input("Asset 3", "")
     tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
@@ -47,49 +47,59 @@ with st.sidebar:
     flood_risk = st.slider("Flood Exposure (%)", 0, 100, 45)
     wacc = st.slider("WACC (%)", 5.0, 15.0, 8.0) / 100
 
-# --- DATA ENGINE ---
-@st.cache_data(ttl=3600)
-def fetch_safe_data(ticker_list):
+# --- DATA ENGINE (REBUILT FOR STABILITY) ---
+@st.cache_data(ttl=600) # ลดเวลา Cache เพื่อให้ข้อมูลสดใหม่เสมอ
+def fetch_robust_data(ticker_list):
+    full_res = {}
+    combined_prices = pd.DataFrame()
+    
+    # ดึงข้อมูล Proxy แยกต่างหากเพื่อความปลอดภัย
     try:
-        all_fetch = ticker_list + ["PTTEP.BK", "EA.BK", "^SET.BK"]
-        data = yf.download(all_fetch, period="5y", interval="1d", progress=False)['Close']
-        if isinstance(data, pd.Series): data = data.to_frame()
-        data = data.ffill().bfill() 
+        proxies = yf.download(["PTTEP.BK", "EA.BK", "^SET.BK"], period="5y", progress=False)['Close']
+        proxies = proxies.ffill().bfill()
+    except:
+        proxies = pd.DataFrame()
 
-        full_res = {}
-        for symbol in ticker_list:
-            if symbol in data.columns:
-                stock_history = data[symbol].dropna()
-                if stock_history.empty: continue
-                
-                # Modeling Transition Risk
+    for symbol in ticker_list:
+        try:
+            # ดึงข้อมูลหุ้นรายตัว
+            ticker_data = yf.download(symbol, period="5y", progress=False)['Close']
+            if ticker_data.empty: continue
+            
+            ticker_data = ticker_data.to_frame(name=symbol)
+            combined_prices = pd.concat([combined_prices, ticker_data], axis=1)
+            
+            t_obj = yf.Ticker(symbol)
+            
+            # คำนวณ Carbon Beta (ถ้ามีข้อมูล Proxy ครบ)
+            c_beta, m_beta = 0.0, 1.0
+            if not proxies.empty:
                 try:
-                    mkt_data = data[["PTTEP.BK", "EA.BK", "^SET.BK"]].dropna()
-                    combined = pd.concat([stock_history, mkt_data], axis=1).pct_change().dropna()
-                    bmg = combined["PTTEP.BK"] - combined["EA.BK"]
-                    X = sm.add_constant(pd.DataFrame({'Market': combined["^SET.BK"], 'Carbon': bmg}))
-                    model = sm.OLS(combined[symbol], X).fit()
+                    temp_df = pd.concat([ticker_data, proxies], axis=1).pct_change().dropna()
+                    bmg = temp_df["PTTEP.BK"] - temp_df["EA.BK"]
+                    X = sm.add_constant(pd.DataFrame({'Market': temp_df["^SET.BK"], 'Carbon': bmg}))
+                    model = sm.OLS(temp_df[symbol], X).fit()
                     c_beta, m_beta = model.params['Carbon'], model.params['Market']
-                except: c_beta, m_beta = 0.0, 1.0
+                except: pass
 
-                t_obj = yf.Ticker(symbol)
-                full_res[symbol] = {
-                    "last_price": stock_history.iloc[-1],
-                    "history": stock_history,
-                    "carbon_beta": c_beta,
-                    "market_beta": m_beta,
-                    "info": t_obj.info,
-                    "news": t_obj.news[:5]
-                }
-        return full_res, data[ticker_list].dropna()
-    except: return None, None
+            full_res[symbol] = {
+                "last_price": ticker_data[symbol].dropna().iloc[-1],
+                "history": ticker_data[symbol],
+                "carbon_beta": c_beta,
+                "market_beta": m_beta,
+                "info": t_obj.info,
+                "news": t_obj.news[:5]
+            }
+        except: continue
+        
+    return full_res, combined_prices
 
 # --- MAIN DISPLAY ---
 st.title("🏛️ Sustainable Finance & Climate Risk Intelligence")
-st.markdown(f"Market Intelligence Terminal | {datetime.now().strftime('%d %B %Y')}")
+st.markdown(f"**Market Intelligence Terminal** | {datetime.now().strftime('%d %B %Y')}")
 
 if tickers:
-    analysis, history = fetch_safe_data(tickers)
+    analysis, history = fetch_robust_data(tickers)
     
     if analysis:
         # Overview Cards
@@ -101,14 +111,14 @@ if tickers:
         tabs = st.tabs([f"Asset: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
-                # Row 1: Fundamentals
+                # ข้อมูลหุ้นยังอยู่ครบถ้วน
                 f1, f2, f3, f4 = st.columns(4)
                 f1.metric("P/E Ratio", d['info'].get('trailingPE', 'N/A'))
                 f2.metric("Div. Yield", f"{d['info'].get('dividendYield', 0)*100:.2f}%")
                 f3.metric("Market Cap", f"{d['info'].get('marketCap', 0)/1e9:.1f}B")
                 f4.metric("Market Beta", f"{d['market_beta']:.2f}")
 
-                # Row 2: Charts
+                # Charts
                 c_l, c_r = st.columns([2, 1])
                 with c_l:
                     st.subheader("📈 Price Momentum")
@@ -121,40 +131,33 @@ if tickers:
                     fig_gauge.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_gauge, use_container_width=True)
 
-                # Row 3: Climate Valuation (Waterfall)
+                # Waterfall (Fixed ValueError)
                 st.divider()
-                r_l, r_r = st.columns(2)
-                with r_l:
-                    st.subheader("💰 Equity Value Bridge (MB)")
-                    # ป้องกัน ValueError โดยเช็คค่า Market Cap
-                    mkt_cap_raw = d['info'].get('marketCap')
-                    mkt_cap_mb = float(mkt_cap_raw)/1e6 if mkt_cap_raw else 1000.0
-                    val_impact = (tax_price * 1000) / wacc / 1e6
-                    
-                    st.info(f"**Climate Insight:** {symbol} เสี่ยงอุทกภัย {flood_risk}% | มูลค่าที่หายไป: -{val_impact:,.2f}M")
-                    
-                    fig_water = go.Figure(go.Waterfall(
-                        orientation = "v", x = ["Current Cap", "Climate Loss", "Adjusted Value"],
-                        y = [mkt_cap_mb, -val_impact, mkt_cap_mb - val_impact],
-                        measure = ["relative", "relative", "total"],
-                        decreasing = {"marker":{"color":"#E74C3C"}},
-                        total = {"marker":{"color":"#3498DB"}}
-                    ))
-                    fig_water.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
-                    st.plotly_chart(fig_water, use_container_width=True)
+                st.subheader("💰 Equity Value Bridge (MB)")
+                mkt_cap_mb = float(d['info'].get('marketCap', 1e9))/1e6
+                val_impact = (tax_price * 1000) / wacc / 1e6
+                
+                fig_water = go.Figure(go.Waterfall(
+                    orientation = "v", x = ["Current Cap", "Climate Loss", "Adjusted Value"],
+                    y = [mkt_cap_mb, -val_impact, mkt_cap_mb - val_impact],
+                    measure = ["relative", "relative", "total"],
+                    decreasing = {"marker":{"color":"#E74C3C"}},
+                    total = {"marker":{"color":"#3498DB"}}
+                ))
+                fig_water.update_layout(height=350, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
+                st.plotly_chart(fig_water, use_container_width=True)
+                
+                # News
+                st.subheader("📰 Latest News")
+                for n in d['news']:
+                    st.write(f"**[{n.get('publisher','N/A')}]** {n.get('title','N/A')}")
+                    st.divider()
 
-                with r_r:
-                    st.subheader("📰 Latest Insights")
-                    if d['news']:
-                        for n in d['news']:
-                            st.write(f"**[{n.get('publisher','N/A')}]** {n.get('title','N/A')}")
-                            st.divider()
-                    else: st.warning("ไม่พบข่าวสารล่าสุด")
-
-        # 3. Overall Comparative Chart
+        # Overall Comparative Momentum
         st.divider()
-        st.subheader("📉 Multi-Asset Relative Performance")
-        norm_prices = (history / history.iloc[0]) * 100
-        st.line_chart(norm_prices)
+        st.subheader("📉 Normalized Momentum Comparison")
+        if not history.empty:
+            norm_prices = (history / history.iloc[0]) * 100
+            st.line_chart(norm_prices)
 
-    else: st.error("❌ ไม่พบข้อมูล Ticker ที่ระบุ กรุณาตรวจสอบ (เช่น PTT.BK)")
+    else: st.error("❌ ไม่พบข้อมูล Ticker ที่ระบุ กรุณาลองใหม่อีกครั้ง หรือตรวจสอบตัวสะกด (เช่น PTT.BK)")
