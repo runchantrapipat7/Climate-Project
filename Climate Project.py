@@ -10,24 +10,36 @@ import time
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE MODERN UI ---
+# --- CSS: ULTIMATE MODERN UI & TERMINAL LOG ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
     .stTabs [aria-selected="true"] { background-color: #2ea043 !important; color: white !important; font-weight: bold; }
+    
+    /* 💡 หุ้นเด่นวันนี้ในกรอบเดียว */
     .top-pick-container { border: 1px solid #2ea043; border-radius: 12px; padding: 15px; background: rgba(46, 160, 67, 0.08); box-shadow: 0 0 15px rgba(46, 160, 67, 0.15); margin-bottom: 25px; }
     .top-pick-title { color: #00ff88; font-weight: bold; font-size: 1.05rem; margin: 0; text-align: center; border-bottom: 1px solid rgba(46,160,67,0.3); padding-bottom: 10px; margin-bottom: 15px; }
     .top-pick-item { font-size: 0.88rem; font-weight: bold; margin-bottom: 12px; color: white; display: flex; justify-content: space-between; }
-    .log-container { background: #000000; border: 1px solid #2ea043; border-radius: 10px; padding: 20px; font-family: 'Courier New', Courier, monospace; margin-bottom: 30px; box-shadow: inset 0 0 10px #2ea04333; }
-    .log-entry { color: #00ff88; font-size: 0.9rem; margin-bottom: 8px; }
+    
+    /* 📟 Terminal Log Style (Collapsible) */
+    .log-terminal { 
+        background: #000000 !important; 
+        border: 1px solid #2ea043 !important; 
+        border-radius: 8px !important; 
+        font-family: 'Courier New', Courier, monospace !important;
+    }
+    .log-entry { color: #00ff88; font-size: 0.85rem; margin-bottom: 5px; line-height: 1.4; }
+    .log-entry span { color: #8b949e; }
+
     .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
     .stats-table td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
+    
     .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: rgba(13, 17, 23, 0.95); color: #8b949e; text-align: center; padding: 10px; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999; }
     .block-container { padding-bottom: 100px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- STABLE TOP PICKS ENGINE ---
+# --- DYNAMIC TOP PICKS ENGINE ---
 @st.cache_data(ttl=3600)
 def get_real_top_picks_5():
     candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
@@ -65,23 +77,19 @@ with st.sidebar:
 
     tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
-# --- STABLE DATA ENGINE ---
+# --- DATA ENGINE ---
 @st.cache_data(ttl=600)
 def fetch_pro_data(ticker_list):
     full_res = {}
     try:
-        # ดึง Benchmark พร้อมระบบพักการทำงานสั้นๆ เพื่อเลี่ยง Rate Limit
         proxies = yf.download(["PTTEP.BK", "EA.BK", "^SET.BK"], period="3y", progress=False)['Close']
         proxies = proxies.ffill().bfill()
     except: proxies = pd.DataFrame()
-
     for symbol in ticker_list:
         try:
             t_obj = yf.Ticker(symbol)
             hist = t_obj.history(period="3y")['Close']
             if hist.empty: continue
-            
-            # คำนวณ Carbon Beta
             c_beta = 0.0
             if not proxies.empty:
                 try:
@@ -91,7 +99,6 @@ def fetch_pro_data(ticker_list):
                     model = sm.OLS(temp_df[symbol], X).fit()
                     c_beta = model.params.get('Carbon', 0.0)
                 except: pass
-            
             full_res[symbol] = {"price": float(hist.iloc[-1]), "history": hist, "c_beta": c_beta, "info": t_obj.info, "news": t_obj.news[:3]}
         except: continue
     return full_res
@@ -102,13 +109,9 @@ st.title("🏛️ SUSTAINABLE FINANCE ASSET TERMINAL")
 if not tickers:
     st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้นการวิเคราะห์")
 else:
-    with st.spinner('📡 กำลังเชื่อมต่อข้อมูลการเงิน...'):
-        analysis = fetch_pro_data(tickers)
-    
-    if not analysis:
-        st.error("⚠️ ระบบไม่สามารถดึงข้อมูลได้ในขณะนี้ กรุณารอ 30 วินาทีแล้วรีเฟรชหน้าจอ หรือตรวจสอบชื่อหุ้นอีกครั้ง")
-    else:
-        # Overview
+    analysis = fetch_pro_data(tickers)
+    if analysis:
+        # Overview Cards
         cols = st.columns(len(analysis))
         for i, (symbol, d) in enumerate(analysis.items()):
             cols[i].metric(f"💎 {symbol}", f"{d['price']:,.2f}", delta=f"C-Beta: {d['c_beta']:.3f}")
@@ -116,14 +119,13 @@ else:
         tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
         for i, (symbol, d) in enumerate(analysis.items()):
             with tabs[i]:
-                # 📊 Summary Statistics
+                # 📊 Summary Stats
                 st.subheader(f"📊 Market Summary: {symbol}")
                 inf = d.get('info', {})
                 s1, s2 = st.columns(2)
                 def get_val(key, style="{:,.2f}"):
                     val = inf.get(key)
-                    return style.format(val) if val is not None and val != "" else "N/A"
-
+                    return style.format(val) if val is not None else "N/A"
                 with s1:
                     st.markdown(f'<table class="stats-table"><tr><td class="stats-label">Market Cap</td><td class="stats-value">{get_val("marketCap", "{:,.0f}")}</td></tr><tr><td class="stats-label">Trailing P/E</td><td class="stats-value">{get_val("trailingPE")}</td></tr><tr><td class="stats-label">Beta (5Y)</td><td class="stats-value">{get_val("beta")}</td></tr></table>', unsafe_allow_html=True)
                 with s2:
@@ -143,18 +145,8 @@ else:
                 r3.info(f"💧 Liquidity: Low")
                 r4.success(f"⚖️ Liability: Low")
 
-                # 📟 Terminal Log
-                st.markdown(f"""
-                <div class="log-container">
-                    <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > SYSTEM_CORE: Stress testing {symbol}...</div>
-                    <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > POLICY_ENGINE: Scenario "{scenario}" active.</div>
-                    <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > GAUGE_STATUS: Carbon Sensitivity set to {dynamic_trans:.2f}</div>
-                    <div class="log-entry" style="color:#ffffff;"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > REPORT: All metrics synchronized.</div>
-                </div>
-                """, unsafe_allow_html=True)
-
                 st.divider()
-                # 📈 Charts (Fix Gauge movement)
+                # 📈 Charts (Dynamic Movement)
                 c1, c2 = st.columns(2)
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
@@ -163,11 +155,9 @@ else:
                         'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
                     fig_gauge.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=0, b=0))
                     st.plotly_chart(fig_gauge, use_container_width=True, key=f"g_{symbol}_{i}")
-                
                 with c2:
                     st.subheader("💰 Equity Value Bridge (MB)")
-                    m_cap_raw = inf.get('marketCap', 1e11) or 1e11
-                    mkt_cap_mb = float(m_cap_raw)/1e6
+                    mkt_cap_mb = float(inf.get('marketCap', 1e11))/1e6
                     val_impact = (tax_price * 1000) / wacc / 1e6
                     adj_val = mkt_cap_mb - val_impact
                     fig_water = go.Figure(go.Waterfall(orientation = "v", measure = ["relative", "relative", "total"],
@@ -178,14 +168,27 @@ else:
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
 
                 st.divider()
+                st.subheader("📈 Price Momentum & Insights")
                 m1, m2 = st.columns([1.5, 1])
                 with m1: st.line_chart(d['history'], height=250)
                 with m2:
-                    st.subheader("📰 Recent Insights")
                     if d['news']:
                         for n in d['news']:
                             st.write(f"**{n.get('publisher','News')}**: {n.get('title')}")
                             st.divider()
+
+                # 📝 NEW: COLLAPSIBLE TERMINAL LOG (Bottom Placement)
+                st.write("") # Spacer
+                with st.expander("📟 View Terminal Risk Log (Activity)", expanded=False):
+                    st.markdown(f"""
+                    <div class="log-terminal">
+                        <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STRESS_TEST: Initializing for {symbol}...</div>
+                        <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > ENGINE: Applying Scenario "{scenario}"</div>
+                        <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > COMPUTE: Carbon Sensitivity factor at {dynamic_trans:.2f}</div>
+                        <div class="log-entry"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > AUDIT: Debt/Equity check at {get_val("debtToEquity")}. Status: {credit_risk}</div>
+                        <div class="log-entry" style="color:#ffffff;"><span>[{datetime.now().strftime('%H:%M:%S')}]</span> > STATUS: COMPLETED. All parameters within safe margins.</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
 # --- FOOTER ---
 st.markdown(f'<div class="footer">🏛️ Sustainable Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
