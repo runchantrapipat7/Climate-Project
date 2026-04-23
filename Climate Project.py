@@ -25,7 +25,7 @@ st.markdown("""
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
-    asset_class = st.radio("Asset Class", ["Equity", "Mutual Fund"], horizontal=True)
+    asset_class = st.radio("Asset Class", ["Stock", "Mutual Fund"], horizontal=True)
     ticker_input = st.text_input("Symbol Ticker (เช่น PTT.BK, CPALL.BK)", "PTT.BK")
     
     st.divider()
