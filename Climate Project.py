@@ -9,7 +9,7 @@ from datetime import datetime
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE MODERN UI & NEON TOP PICKS (SINGLE BOX) ---
+# --- CSS: ULTIMATE MODERN UI & FIXED SINGLE BOX TOP PICKS ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -24,7 +24,7 @@ st.markdown("""
         background-color: #2ea043 !important; color: white !important; font-weight: bold;
     }
 
-    /* 💡 หุ้นเด่นวันนี้ ดีไซน์กรอบเดียว (Single Container) */
+    /* 💡 หุ้นเด่นวันนี้ ดีไซน์กรอบเดียวแบบสมบูรณ์ */
     .top-pick-container {
         border: 1px solid #2ea043;
         border-radius: 12px;
@@ -34,20 +34,15 @@ st.markdown("""
         margin-bottom: 25px;
     }
     .top-pick-header-box {
-        border-bottom: 1px solid rgba(46, 160, 67, 0.3);
         padding-bottom: 10px;
-        margin-bottom: 15px;
+        margin-bottom: 12px;
         text-align: center;
+        border-bottom: 1px solid rgba(46, 160, 67, 0.3);
     }
     .top-pick-title {
         color: #00ff88;
         font-weight: bold;
         font-size: 1.05rem;
-        margin: 0;
-    }
-    .top-pick-list {
-        list-style-type: none;
-        padding: 0;
         margin: 0;
     }
     .top-pick-item {
@@ -58,13 +53,17 @@ st.markdown("""
         display: flex;
         justify-content: space-between;
     }
-    .top-pick-subtext {
-        font-size: 0.72rem;
+    .active-vol-label {
         color: #8b949e;
-        margin-top: 15px;
+        font-weight: normal;
+        font-size: 0.72rem;
+    }
+    .top-pick-subtext {
+        font-size: 0.7rem;
+        color: #8b949e;
+        margin-top: 12px;
         text-align: center;
-        border-top: 1px solid rgba(255,255,255,0.05);
-        padding-top: 10px;
+        opacity: 0.7;
     }
 
     /* อื่นๆ */
@@ -87,7 +86,6 @@ st.markdown("""
 # --- DYNAMIC TOP PICKS ENGINE (5 STOCKS) ---
 @st.cache_data(ttl=3600)
 def get_real_top_picks_5():
-    # รายชื่อหุ้นผู้นำตลาด
     candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCC.BK", "SCB.BK", "BDMS.BK"]
     picks = []
     for t in candidate_tickers:
@@ -97,22 +95,41 @@ def get_real_top_picks_5():
             if not data.empty:
                 picks.append({"symbol": t, "volume": data['Volume'].iloc[-1]})
         except: continue
-    # เลือก 5 ตัวที่ Volume สูงสุด
     return sorted(picks, key=lambda x: x['volume'], reverse=True)[:5]
 
 # --- SIDEBAR ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
     
-    # 💡 หุ้นเด่นวันนี้ ดีไซน์กรอบเดียว 5 ตัว
+    # 💡 หุ้นเด่นวันนี้ แบบรวมในกรอบเดียวสมบูรณ์
     top_stocks = get_real_top_picks_5()
-    st.markdown('<div class="top-pick-container">', unsafe_allow_html=True)
-    st.markdown('<div class="top-pick-header-box"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p></div>', unsafe_allow_html=True)
+    
+    # เริ่มต้นกรอบ
+    top_picks_html = f"""
+    <div class="top-pick-container">
+        <div class="top-pick-header-box">
+            <p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p>
+        </div>
+    """
+    
+    # เพิ่มรายชื่อหุ้นเข้าไปใน HTML ตัวแปรเดียว
     if top_stocks:
         for stock in top_stocks:
-            st.markdown(f'<div class="top-pick-item"><span>{stock["symbol"]}</span><span style="color:#8b949e; font-weight:normal; font-size:0.75rem;">Active Vol.</span></div>', unsafe_allow_html=True)
-    st.markdown('<div class="top-pick-subtext">อัปเดตข้อมูลจาก Yahoo Finance รายวัน</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+            top_picks_html += f"""
+            <div class="top-pick-item">
+                <span>{stock['symbol']}</span>
+                <span class="active-vol-label">Active Vol.</span>
+            </div>
+            """
+    
+    # ปิดกรอบ
+    top_picks_html += """
+        <div class="top-pick-subtext">อัปเดตข้อมูลจาก Yahoo Finance รายวัน</div>
+    </div>
+    """
+    
+    # แสดงผล HTML ก้อนเดียว
+    st.markdown(top_picks_html, unsafe_allow_html=True)
 
     with st.expander("🔍 ระบุชื่อหุ้นหรือกองทุน (Stock or Bond)", expanded=True):
         t1 = st.text_input("Asset 1", "PTT.BK")
@@ -212,7 +229,7 @@ if tickers:
                         increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
                     fig_water.update_layout(height=300, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
                     st.plotly_chart(fig_water, use_container_width=True, key=f"w_{symbol}_{i}")
-                    st.markdown(f'<div class="insight-card"><b>Insight:</b> คาดการณ์มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="insight-card"><b>Insight:</b> มูลค่าปรับลด <b>-{val_impact:,.2f} MB</b></div>', unsafe_allow_html=True)
                 st.divider()
                 m1, m2 = st.columns([1.5, 1])
                 with m1:
