@@ -114,7 +114,7 @@ def fetch_pro_data(ticker_list):
     return full_res
 
 # --- MAIN DISPLAY ---
-st.title("🏛️ SUSTAINABLE FINANCE ASSET TERMINAL")
+st.title("🏛️ SUSTAINABLE FINANCE AND CLIMATE RISK MODELING")
 
 if tickers:
     analysis = fetch_pro_data(tickers)
