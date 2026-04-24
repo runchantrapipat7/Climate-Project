@@ -10,7 +10,7 @@ import time
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE DARK TERMINAL UI (คงเดิม 100% และเสริมสไตล์วิชาการ) ---
+# --- CSS: ULTIMATE DARK TERMINAL UI (คงเดิม + อัปเกรด Market Cards) ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -42,8 +42,6 @@ st.markdown("""
     .top-pick-item { font-size: 0.88rem; font-weight: bold; margin-bottom: 12px; color: white; display: flex; justify-content: space-between; }
     .log-terminal { background: #000000 !important; border: 1px solid #2ea043 !important; border-radius: 8px; font-family: 'Courier New', Courier, monospace !important; padding: 15px; }
     .log-entry { color: #00ff88; font-size: 0.85rem; margin-bottom: 5px; }
-    .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-    .stats-table td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; color: white !important; }
     
     /* Academic Section Style */
     .academic-box { 
@@ -55,6 +53,36 @@ st.markdown("""
     }
     .academic-label { color: #00ff88; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
     
+    /* --- NEW: Market Summary Modern Card Style --- */
+    .market-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(0, 255, 136, 0.1);
+        border-radius: 12px;
+        padding: 18px;
+        margin-bottom: 10px;
+        transition: all 0.3s ease;
+        text-align: center;
+    }
+    .market-card:hover {
+        background: rgba(0, 255, 136, 0.05);
+        border-color: rgba(0, 255, 136, 0.4);
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+    .market-label {
+        color: #8b949e;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+    }
+    .market-value {
+        color: #ffffff;
+        font-size: 1.15rem;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+    }
+
     .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: rgba(13, 17, 23, 0.95); color: #8b949e; text-align: center; padding: 10px; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999; }
     .block-container { padding-bottom: 100px; }
     </style>
@@ -167,10 +195,9 @@ else:
                 st.subheader(f"📈 Price Performance: {symbol}")
                 st.line_chart(d['history'], color="#00ff88")
 
-                # 2. Market Summary
-                st.subheader(f"📊 Market Summary: {symbol}")
+                # 2. Market Intelligence (Modern UI Updated)
+                st.subheader(f"📊 Market Intelligence: {symbol}")
                 inf = d.get('info', {})
-                s1, s2 = st.columns(2)
                 
                 def get_val(key, style="{:,.2f}", mult=1):
                     v = inf.get(key)
@@ -178,10 +205,22 @@ else:
                     try: return style.format(float(v) * mult)
                     except: return str(v)
 
-                with s1:
-                    st.markdown(f'<table class="stats-table"><tr><td>Market Cap</td><td style="text-align:right">{get_val("marketCap", "{:,.0f}")}</td></tr><tr><td>Trailing P/E</td><td style="text-align:right">{get_val("trailingPE")}</td></tr><tr><td>Beta (5Y)</td><td style="text-align:right">{get_val("beta")}</td></tr></table>', unsafe_allow_html=True)
-                with s2:
-                    st.markdown(f'<table class="stats-table"><tr><td>Profit Margin</td><td style="text-align:right">{get_val("profitMargins", "{:.2%}")}</td></tr><tr><td>Dividend Yield</td><td style="text-align:right">{get_val("dividendYield", "{:.2%}")}</td></tr><tr><td>Debt/Equity</td><td style="text-align:right">{get_val("debtToEquity")}</td></tr></table>', unsafe_allow_html=True)
+                # แสดงผลแบบ Grid 3 คอลัมน์
+                m_c1, m_c2, m_c3 = st.columns(3)
+                m_c4, m_c5, m_c6 = st.columns(3)
+
+                with m_c1:
+                    st.markdown(f'<div class="market-card"><div class="market-label">Market Cap</div><div class="market-value">{get_val("marketCap", "{:,.0f}")}</div></div>', unsafe_allow_html=True)
+                with m_c2:
+                    st.markdown(f'<div class="market-card"><div class="market-label">Trailing P/E</div><div class="market-value">{get_val("trailingPE")}</div></div>', unsafe_allow_html=True)
+                with m_c3:
+                    st.markdown(f'<div class="market-card"><div class="market-label">Beta (5Y)</div><div class="market-value">{get_val("beta")}</div></div>', unsafe_allow_html=True)
+                with m_c4:
+                    st.markdown(f'<div class="market-card"><div class="market-label">Profit Margin</div><div class="market-value">{get_val("profitMargins", "{:.2%}")}</div></div>', unsafe_allow_html=True)
+                with m_c5:
+                    st.markdown(f'<div class="market-card"><div class="market-label">Div. Yield</div><div class="market-value">{get_val("dividendYield", "{:.2%}")}</div></div>', unsafe_allow_html=True)
+                with m_c6:
+                    st.markdown(f'<div class="market-card"><div class="market-label">Debt/Equity</div><div class="market-value">{get_val("debtToEquity")}</div></div>', unsafe_allow_html=True)
 
                 st.divider()
                 # 3. Risk Matrix (ส่วนเดิมของคุณ 100%)
@@ -198,14 +237,12 @@ else:
                 r3.info(f"💧 Liquidity: Low")
                 r4.success(f"⚖️ Liability: Low")
 
-                # --- 🟢 ส่วนที่เพิ่มใหม่: Quantitative Academic Analysis (ไม่ย่อของเดิม) ---
+                # --- 🟢 ส่วน Quantitative Academic Analysis (คงเดิม 100%) ---
                 st.markdown('<div class="academic-box">', unsafe_allow_html=True)
                 st.markdown('<p class="academic-label">🔬 Quantitative Climate Risk Analytics (TCFD Framework)</p>', unsafe_allow_html=True)
                 
                 q1, q2, q3 = st.columns(3)
-                
-                # คำนวณ Value at Risk (Climate-adjusted)
-                climate_var = abs(dynamic_trans) * 0.1 # สมมติฐานเชิงวิชาการ: Sensitivity * 10% market shock
+                climate_var = abs(dynamic_trans) * 0.1
                 
                 with q1:
                     st.write("📊 **Climate Sensitivity Index**")
@@ -222,12 +259,10 @@ else:
                     risk_level = "High Exposure" if abs(d['c_beta']) > 0.3 else "Standard Exposure"
                     st.write(f"ระดับการปะทะ: **{risk_level}**")
                     st.caption("การประเมินความเปราะบางรายตัวเทียบกับค่าเฉลี่ยอุตสาหกรรมในบริบทของ Transition Risk")
-                
                 st.markdown('</div>', unsafe_allow_html=True)
-                # -------------------------------------------------------------------------
 
                 st.divider()
-                # 4. Gauge & Waterfall
+                # 4. Gauge & Waterfall (คงเดิม 100%)
                 c1, c2 = st.columns(2)
                 with c1:
                     st.subheader("🔥 Transition Risk Sensitivity")
