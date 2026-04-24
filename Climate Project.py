@@ -147,7 +147,7 @@ def fetch_pro_data(ticker_list):
     return full_res
 
 # --- MAIN DISPLAY ---
-st.title("🏛️ SUSTAINABLE FINANCE ASSET TERMINAL")
+st.title("🏛️ CLIMATE RISK AND SUSTAINABLE FINANCE 🏛️")
 
 if not tickers:
     st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้น")
@@ -264,4 +264,4 @@ else:
                     st.markdown(f'<div class="log-terminal"><div class="log-entry">[{datetime.now().strftime("%H:%M:%S")}] > SUCCESS: Data synchronized.</div></div>', unsafe_allow_html=True)
 
 # --- FOOTER ---
-st.markdown(f'<div class="footer">🏛️ Sustainable Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer">🏛️ Climate Risk And Sustainable Finance | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
