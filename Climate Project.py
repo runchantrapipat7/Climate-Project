@@ -237,34 +237,26 @@ else:
                 r3.info(f"💧 Liquidity: Low")
                 r4.success(f"⚖️ Liability: Low")
 
-                # --- 🟢 ส่วนที่เพิ่มใหม่: Parameter Tuning สำหรับ Quantitative Analysis ---
-                with st.expander("🧪 Adjust Quantitative Indicators (Real-time Tuning)", expanded=True):
-                    st.markdown("*ปรับแต่งสมมติฐานเพื่อทดสอบผลกระทบต่อ Climate Sensitivity และ VaR*")
-                    pa1, pa2, pa3 = st.columns(3)
-                    with pa1:
-                        # ตัวคูณ Sensitivity เพื่อทดสอบ Stress Test
-                        sens_multiplier = st.slider(f"Stress Factor ({symbol})", 0.5, 3.0, 1.0, 0.1, key=f"s_mul_{symbol}")
-                    with pa2:
-                        # ปรับ % Shock สำหรับการคำนวณ VaR
-                        shock_input = st.slider(f"Policy Shock Intensity % ({symbol})", 1, 100, 10, key=f"s_shk_{symbol}") / 100
-                    with pa3:
-                        # เลือกวิธีการคำนวณ Risk Level
-                        risk_calc_mode = st.selectbox("Vulnerability Logic", ["Standard", "Conservative", "Aggressive"], key=f"s_log_{symbol}")
+                # --- [ส่วนที่เพิ่ม: ปรับแต่งค่า Indicator] ---
+                with st.expander("🔬 Adjust Quantitative Indicators (Real-time Tuning)", expanded=True):
+                    st.markdown("*หากค่าเริ่มต้นเป็น 0.0000 ให้ปรับ Beta Offset เพื่อทดสอบ Scenario*")
+                    p_col1, p_col2, p_col3 = st.columns(3)
+                    with p_col1:
+                        # ตัวบวกค่าพื้นฐาน (Offset) เพื่อแก้ปัญหา 0.0000
+                        beta_offset = st.slider(f"Manual Beta Offset ({symbol})", -1.0, 1.0, 0.0, 0.01, key=f"off_{symbol}")
+                    with p_col2:
+                        # ตัวคูณแรงกระแทก
+                        stress_factor = st.slider(f"Stress Multiplier ({symbol})", 0.5, 5.0, 1.0, 0.1, key=f"stress_{symbol}")
+                    with p_col3:
+                        # ปรับระดับความรุนแรงของ Shock
+                        shock_val = st.slider(f"Policy Shock % ({symbol})", 1, 100, 10, key=f"shock_{symbol}") / 100
                 
-                # คำนวณค่าใหม่แบบ Dynamic
-                adjusted_beta = d['c_beta'] * sens_multiplier
-                dynamic_cvar = abs(adjusted_beta) * shock_input * 100
-                
-                # ปรับแต่ง Risk Level ตาม Logic ที่เลือก
-                if risk_calc_mode == "Conservative":
-                    risk_threshold = 0.2
-                elif risk_calc_mode == "Aggressive":
-                    risk_threshold = 0.5
-                else:
-                    risk_threshold = 0.3
-                # ------------------------------------------------------------------
+                # คำนวณค่าใหม่ที่ตอบสนองต่อการปรับจูน
+                adjusted_c_beta = (d['c_beta'] + beta_offset) * stress_factor
+                climate_var = abs(adjusted_c_beta) * shock_val * 100
+                # ------------------------------------------
 
-                # --- 🟢 ส่วน Quantitative Academic Analysis (แก้ไขให้เชื่อมโยงกับ Indicator ที่ปรับได้) ---
+                # --- 🟢 ส่วน Quantitative Academic Analysis (คงเดิม แต่เปลี่ยนตัวแปรให้ Dynamic) ---
                 st.markdown('<div class="academic-box">', unsafe_allow_html=True)
                 st.markdown('<p class="academic-label">🔬 Quantitative Climate Risk Analytics (TCFD Framework)</p>', unsafe_allow_html=True)
                 
@@ -272,19 +264,21 @@ else:
                 
                 with q1:
                     st.write("📊 **Climate Sensitivity Index**")
-                    st.write(f"ค่าการตอบสนองต่อราคาคาร์บอน: **{adjusted_beta:.4f}**")
-                    st.caption("ปรับปรุงตาม Stress Factor ที่เลือก (Original C-Beta × Multiplier)")
+                    # แสดงผลตัวแปรใหม่ที่ปรับได้
+                    st.write(f"ค่าการตอบสนองต่อราคาคาร์บอน: **{adjusted_c_beta:.4f}**")
+                    st.caption(f"อ้างอิงจากความสัมพันธ์ (Original: {d['c_beta']:.4f} + Offset: {beta_offset:.2f})")
                 
                 with q2:
                     st.write("📉 **Climate Value-at-Risk (CVaR)**")
-                    st.write(f"ความเสี่ยงมูลค่าที่อาจสูญเสีย: <span style='color:#ff4b4b;'>**{dynamic_cvar:,.2f}%**</span>", unsafe_allow_html=True)
-                    st.caption(f"ประมาณการความเสียหายที่ Shock Intensity {shock_input*100:.0f}%")
+                    # แสดงผลตัวแปรใหม่ที่ปรับได้
+                    st.write(f"ความเสี่ยงมูลค่าที่อาจสูญเสีย: <span style='color:#ff4b4b;'>**{climate_var:,.2f}%**</span>", unsafe_allow_html=True)
+                    st.caption(f"ประมาณการความเสียหายกรณี Shock {shock_val*100:.0f}%")
 
                 with q3:
                     st.write("🏢 **Sector Vulnerability**")
-                    risk_level = "High Exposure" if abs(adjusted_beta) > risk_threshold else "Standard Exposure"
+                    risk_level = "High Exposure" if abs(adjusted_c_beta) > 0.3 else "Standard Exposure"
                     st.write(f"ระดับการปะทะ: **{risk_level}**")
-                    st.caption(f"ประเมินภายใต้ตรรกะแบบ {risk_calc_mode} (Threshold: {risk_threshold})")
+                    st.caption("การประเมินความเปราะบางรายตัวเทียบกับค่าเฉลี่ยอุตสาหกรรมในบริบทของ Transition Risk")
                 st.markdown('</div>', unsafe_allow_html=True)
 
                 st.divider()
