@@ -237,28 +237,54 @@ else:
                 r3.info(f"💧 Liquidity: Low")
                 r4.success(f"⚖️ Liability: Low")
 
-                # --- 🟢 ส่วน Quantitative Academic Analysis (คงเดิม 100%) ---
+                # --- 🟢 ส่วนที่เพิ่มใหม่: Parameter Tuning สำหรับ Quantitative Analysis ---
+                with st.expander("🧪 Adjust Quantitative Indicators (Real-time Tuning)", expanded=True):
+                    st.markdown("*ปรับแต่งสมมติฐานเพื่อทดสอบผลกระทบต่อ Climate Sensitivity และ VaR*")
+                    pa1, pa2, pa3 = st.columns(3)
+                    with pa1:
+                        # ตัวคูณ Sensitivity เพื่อทดสอบ Stress Test
+                        sens_multiplier = st.slider(f"Stress Factor ({symbol})", 0.5, 3.0, 1.0, 0.1, key=f"s_mul_{symbol}")
+                    with pa2:
+                        # ปรับ % Shock สำหรับการคำนวณ VaR
+                        shock_input = st.slider(f"Policy Shock Intensity % ({symbol})", 1, 100, 10, key=f"s_shk_{symbol}") / 100
+                    with pa3:
+                        # เลือกวิธีการคำนวณ Risk Level
+                        risk_calc_mode = st.selectbox("Vulnerability Logic", ["Standard", "Conservative", "Aggressive"], key=f"s_log_{symbol}")
+                
+                # คำนวณค่าใหม่แบบ Dynamic
+                adjusted_beta = d['c_beta'] * sens_multiplier
+                dynamic_cvar = abs(adjusted_beta) * shock_input * 100
+                
+                # ปรับแต่ง Risk Level ตาม Logic ที่เลือก
+                if risk_calc_mode == "Conservative":
+                    risk_threshold = 0.2
+                elif risk_calc_mode == "Aggressive":
+                    risk_threshold = 0.5
+                else:
+                    risk_threshold = 0.3
+                # ------------------------------------------------------------------
+
+                # --- 🟢 ส่วน Quantitative Academic Analysis (แก้ไขให้เชื่อมโยงกับ Indicator ที่ปรับได้) ---
                 st.markdown('<div class="academic-box">', unsafe_allow_html=True)
                 st.markdown('<p class="academic-label">🔬 Quantitative Climate Risk Analytics (TCFD Framework)</p>', unsafe_allow_html=True)
                 
                 q1, q2, q3 = st.columns(3)
-                climate_var = abs(dynamic_trans) * 0.1
                 
                 with q1:
                     st.write("📊 **Climate Sensitivity Index**")
-                    st.write(f"ค่าการตอบสนองต่อราคาคาร์บอน: **{d['c_beta']:.4f}**")
-                    st.caption("อ้างอิงจากความสัมพันธ์ของผลตอบแทนสินทรัพย์ต่อส่วนต่างราคาสินทรัพย์สีน้ำตาลและสีเขียว (Brown-minus-Green Factor)")
+                    st.write(f"ค่าการตอบสนองต่อราคาคาร์บอน: **{adjusted_beta:.4f}**")
+                    st.caption("ปรับปรุงตาม Stress Factor ที่เลือก (Original C-Beta × Multiplier)")
                 
                 with q2:
                     st.write("📉 **Climate Value-at-Risk (CVaR)**")
-                    st.write(f"ความเสี่ยงมูลค่าที่อาจสูญเสีย: <span style='color:#ff4b4b;'>**{climate_var:,.2f}%**</span>", unsafe_allow_html=True)
-                    st.caption("ประมาณการความเสียหายของมูลค่าหลักทรัพย์ในกรณีที่เกิดนโยบายคาร์บอนแบบฉับพลัน (Shock Scenario)")
+                    st.write(f"ความเสี่ยงมูลค่าที่อาจสูญเสีย: <span style='color:#ff4b4b;'>**{dynamic_cvar:,.2f}%**</span>", unsafe_allow_html=True)
+                    st.caption(f"ประมาณการความเสียหายที่ Shock Intensity {shock_input*100:.0f}%")
 
                 with q3:
                     st.write("🏢 **Sector Vulnerability**")
-                    risk_level = "High Exposure" if abs(d['c_beta']) > 0.3 else "Standard Exposure"
+                    risk_level = "High Exposure" if abs(adjusted_beta) > risk_threshold else "Standard Exposure"
                     st.write(f"ระดับการปะทะ: **{risk_level}**")
-                    st.caption("การประเมินความเปราะบางรายตัวเทียบกับค่าเฉลี่ยอุตสาหกรรมในบริบทของ Transition Risk")
+                    st.caption(f"ประเมินภายใต้ตรรกะแบบ {risk_calc_mode} (Threshold: {risk_threshold})")
                 st.markdown('</div>', unsafe_allow_html=True)
 
                 st.divider()
