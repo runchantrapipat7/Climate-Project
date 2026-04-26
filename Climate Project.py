@@ -10,7 +10,7 @@ import time
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate & Global Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE DARK TERMINAL UI (รักษาไว้ครบถ้วน 100%) ---
+# --- CSS: ULTIMATE DARK TERMINAL UI (รักษาไว้ครบถ้วน 100% จากต้นฉบับของคุณ) ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -54,20 +54,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- TOP PICKS ENGINE ---
-@st.cache_data(ttl=3600)
-def get_real_top_picks_5():
-    candidate_tickers = ["AOT.BK", "PTT.BK", "KBANK.BK", "GULF.BK", "CPALL.BK"]
-    picks = []
-    try:
-        data = yf.download(candidate_tickers, period="5d", progress=False)['Volume']
-        for t in candidate_tickers:
-            if t in data.columns:
-                v = data[t].dropna()
-                if not v.empty: picks.append({"symbol": t, "volume": v.iloc[-1]})
-    except: pass
-    return sorted(picks, key=lambda x: x['volume'], reverse=True)[:5]
-
 # --- GLOBAL DATA ENGINE ---
 @st.cache_data(ttl=600)
 def fetch_pro_data(ticker_list, market_mode="TH"):
@@ -77,13 +63,25 @@ def fetch_pro_data(ticker_list, market_mode="TH"):
     try:
         proxies = yf.download(["PTTEP.BK", "EA.BK", ref_idx], period="1y", progress=False)['Close'].ffill()
     except: pass
+
     for symbol in ticker_list:
         try:
             t_obj = yf.Ticker(symbol)
             hist = t_obj.history(period="2y")['Close'].ffill() 
             if hist.empty: continue
-            info = t_obj.info if t_obj.info else {"shortName": symbol}
-            news = t_obj.news[:5] if hasattr(t_obj, 'news') else []
+            
+            info = {}
+            try:
+                info = t_obj.info if t_obj.info else {}
+                fast = t_obj.fast_info
+                if fast:
+                    info['marketCap'] = info.get('marketCap') or fast.get('market_cap')
+            except: info = {"shortName": symbol}
+
+            news = []
+            try: news = t_obj.news[:3]
+            except: pass
+
             c_beta = 0.0
             if not proxies.empty:
                 try:
@@ -93,194 +91,339 @@ def fetch_pro_data(ticker_list, market_mode="TH"):
                     X = sm.add_constant(pd.DataFrame({'Market': combined['market'], 'Carbon': bmg}))
                     c_beta = sm.OLS(combined['target'], X).fit().params.get('Carbon', 0.0)
                 except: pass
-            full_res[symbol] = {"price": float(hist.iloc[-1]), "history": hist, "c_beta": c_beta, "info": info, "news": news}
+
+            full_res[symbol] = {
+                "price": float(hist.iloc[-1]),
+                "history": hist,
+                "c_beta": c_beta,
+                "info": info,
+                "news": news
+            }
         except: continue
     return full_res
 
-# --- SIDEBAR NAVIGATION ---
+# --- SIDEBAR NAVIGATION (เพิ่มรายการใน Module) ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
-    terminal_mode = st.radio("Select Module", [
-        "🏛️ Thai Climate Risk Project", 
-        "📈 Thai Stock Predict & Analysis", 
-        "🌎 Global Technical Analysis"
-    ])
+    terminal_mode = st.radio("Select Module", ["🏛️ Thai Climate Risk", "🌎 Global Technical Analysis", "📈 Thai Technical Analysis"])
     st.divider()
 
-    if terminal_mode == "🏛️ Thai Climate Risk Project":
+# ==========================================
+# MODULE 1: THAI CLIMATE RISK (ห้ามลบ/ย่อของเดิม)
+# ==========================================
+if terminal_mode == "🏛️ Thai Climate Risk":
+    @st.cache_data(ttl=3600)
+    def get_real_top_picks_5():
+        candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
+        picks = []
+        try:
+            data = yf.download(candidate_tickers, period="5d", progress=False)['Volume']
+            for t in candidate_tickers:
+                if t in data.columns:
+                    v = data[t].dropna()
+                    if not v.empty: picks.append({"symbol": t, "volume": v.iloc[-1]})
+        except: pass
+        return sorted(picks, key=lambda x: x['volume'], reverse=True)[:5]
+
+    with st.sidebar:
         top_stocks = get_real_top_picks_5()
         stocks_html = "".join([f'<div class="top-pick-item"><span>{s["symbol"]}</span><span style="color:#8b949e; font-size:0.7rem;">Active Vol.</span></div>' for s in top_stocks])
         st.markdown(f'<div class="top-pick-container"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p>{stocks_html}</div>', unsafe_allow_html=True)
-        with st.expander("🔍 Thai Stock Selection", expanded=True):
-            t1 = st.text_input("Stock 1", "PTT.BK", key="cli1")
-            t2 = st.text_input("Stock 2", "GULF.BK", key="cli2")
-            t3 = st.text_input("Stock 3", "", key="cli3")
+
+        with st.expander("🔍 Stock Selection", expanded=True):
+            t1 = st.text_input("Stock 1", "PTT.BK")
+            t2 = st.text_input("Stock 2", "GULF.BK")
+            t3 = st.text_input("Stock 3", "")
+        
+        st.divider()
         with st.expander("🌍 Scenario Policy (TCFD)", expanded=True):
             scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
             tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
             tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
+        
+        st.divider()
+        with st.expander("⚙️ Physical Risk Parameters", expanded=True):
             flood_risk = st.slider("Flood Exposure (%)", 0, 100, 35)
             wacc = st.slider("WACC (%)", 5.0, 20.0, 12.0) / 100
-        current_tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
-        market_type = "TH"
 
-    elif terminal_mode == "📈 Thai Stock Predict & Analysis":
-        with st.expander("🔍 Thai Stock Selection", expanded=True):
-            t1 = st.text_input("Stock 1", "CPALL.BK", key="tr1")
-            t2 = st.text_input("Stock 2", "AOT.BK", key="tr2")
-            t3 = st.text_input("Stock 3", "", key="tr3")
-        with st.expander("📈 Strategy Settings", expanded=True):
-            ma_s_th = st.slider("Short MA", 5, 50, 20)
-            ma_l_th = st.slider("Long MA", 50, 200, 50)
-            rsi_w_th = st.slider("RSI Period", 7, 30, 14)
-        current_tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
-        market_type = "TH"
+        tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
-    elif terminal_mode == "🌎 Global Technical Analysis":
-        with st.expander("🔍 Global Stock Entry", expanded=True):
-            g1 = st.text_input("Stock 1", "AAPL", key="gl1")
-            g2 = st.text_input("Stock 2", "NVDA", key="gl2")
-            g3 = st.text_input("Stock 3", "TSLA", key="gl3")
-        with st.expander("📈 Strategy Settings", expanded=True):
-            g_ma_s = st.slider("Short MA ", 5, 50, 20)
-            g_ma_l = st.slider("Long MA ", 50, 200, 50)
-            g_rsi = st.slider("RSI Period ", 7, 30, 14)
-        current_tickers = [t.strip().upper() for t in [g1, g2, g3] if t.strip()]
-        market_type = "Global"
-
-# ==========================================
-# MAIN EXECUTION
-# ==========================================
-if current_tickers:
-    analysis_data = fetch_pro_data(current_tickers, market_mode=market_type)
-    
-    if terminal_mode == "🏛️ Thai Climate Risk Project":
-        st.title("🏛️ CLIMATE RISK AND SUSTAINABLE FINANCE (TCFD)")
-        if analysis_data:
-            tabs = st.tabs([f"Intelligence: {s}" for s in analysis_data.keys()])
-            for i, (symbol, d) in enumerate(analysis_data.items()):
+    st.title("🏛️ THAI CLIMATE RISK AND FINANCIAL DEEP DIVE")
+    if not tickers:
+        st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้น")
+    else:
+        analysis = fetch_pro_data(tickers, market_mode="TH")
+        if analysis:
+            tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
+            for i, (symbol, d) in enumerate(analysis.items()):
                 with tabs[i]:
-                    st.markdown(f"### 🇹🇭 {symbol} - Sustainability Report")
-                    st.markdown(f'<p class="market-header-sub">SET Thailand Real Time • THB</p>', unsafe_allow_html=True)
+                    st.markdown(f"### 🇹🇭 {symbol} - Stock Exchange of Thailand")
+                    st.markdown(f'<p class="market-header-sub">SET - Thailand Real Time Price • THB</p>', unsafe_allow_html=True)
+
                     m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("Current Price", f"฿{d['price']:,.2f}")
+                    curr_p = d['price']
+                    prev_p = d['history'].iloc[-2]
+                    p_change = ((curr_p - prev_p) / prev_p) * 100
+                    m1.metric("Current Price", f"฿{curr_p:,.2f}", f"{p_change:+.2f}%")
                     m2.metric("Climate Beta", f"{d['c_beta']:.4f}")
                     m3.metric("Market Cap", f"{d.get('info', {}).get('marketCap', 0)/1e9:.2f}B")
-                    m4.metric("Risk Status", "Managed" if abs(d['c_beta']) < 0.2 else "SENSITIVE")
-                    st.line_chart(d['history'].iloc[-252:], color="#00ff88")
-                    inf = d.get('info', {})
-                    st.subheader("📊 Market Intelligence Grid")
-                    def get_val(key, style="{:,.2f}"):
-                        v = inf.get(key); return style.format(float(v)) if v else "N/A"
-                    mc1, mc2, mc3 = st.columns(3); mc4, mc5, mc6 = st.columns(3)
-                    with mc1: st.markdown(f'<div class="market-card"><div class="market-label">P/E Ratio</div><div class="market-value">{get_val("trailingPE")}</div></div>', unsafe_allow_html=True)
-                    with mc2: st.markdown(f'<div class="market-card"><div class="market-label">P/B Ratio</div><div class="market-value">{get_val("priceToBook")}</div></div>', unsafe_allow_html=True)
-                    with mc3: st.markdown(f'<div class="market-card"><div class="market-label">Div. Yield</div><div class="market-value">{get_val("dividendYield", "{:.2%}")}</div></div>', unsafe_allow_html=True)
-                    with mc4: st.markdown(f'<div class="market-card"><div class="market-label">Beta (5Y)</div><div class="market-value">{get_val("beta")}</div></div>', unsafe_allow_html=True)
-                    with mc5: st.markdown(f'<div class="market-card"><div class="market-label">Profit Margin</div><div class="market-value">{get_val("profitMargins", "{:.2%}")}</div></div>', unsafe_allow_html=True)
-                    with mc6: st.markdown(f'<div class="market-card"><div class="market-label">Debt/Equity</div><div class="market-value">{get_val("debtToEquity")}</div></div>', unsafe_allow_html=True)
-                    st.divider()
-                    st.markdown('<div class="academic-box"><p class="academic-label">🔬 Quantitative Climate Analytics (TCFD)</p>', unsafe_allow_html=True)
-                    q1, q2, q3 = st.columns(3); dynamic_trans = d['c_beta'] * 100 * tax_multiplier; climate_var = abs(dynamic_trans) * 0.1
-                    q1.write(f"📊 **Sensitivity:** **{d['c_beta']:.4f}**"); q2.write(f"📉 **Climate VaR:** <span style='color:#ff4b4b;'>**{climate_var:,.2f}%**</span>", unsafe_allow_html=True); q3.write(f"🏢 **Sector Vulnerability:** {'High' if abs(d['c_beta']) > 0.3 else 'Standard'}"); st.markdown('</div>', unsafe_allow_html=True)
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        fig_g = go.Figure(go.Indicator(mode="gauge+number", value=dynamic_trans, title={'text': "Transition Sensitivity"}, gauge={'axis': {'range': [-50, 50]}, 'bar': {'color': "white"}, 'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
-                        fig_g.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=50, b=0)); st.plotly_chart(fig_g, use_container_width=True, key=f"th_cli_gauge_{symbol}")
-                    with c2:
-                        raw_cap = inf.get('marketCap', 1e9); mkt_cap_mb = float(raw_cap)/1e6; val_impact = (tax_price * 1000) / wacc / 1e6; adj_val = mkt_cap_mb - val_impact
-                        fig_w = go.Figure(go.Waterfall(orientation="v", x=["Initial", "Climate Loss", "Adjusted"], y=[mkt_cap_mb, -val_impact, adj_val], textposition="outside", increasing={"marker":{"color":"#2ea043"}}, decreasing={"marker":{"color":"#da3633"}}, totals={"marker":{"color":"#1f6feb"}}))
-                        fig_w.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=20, b=0)); st.plotly_chart(fig_w, use_container_width=True, key=f"th_cli_water_{symbol}")
-                    st.subheader(f"📰 News Feed: {symbol}")
-                    if d['news']:
-                        for n in d['news']: st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}"); st.caption(f"🔗 [Link]({n.get('link')})")
-                    with st.expander("📟 Terminal Log", expanded=False): st.markdown(f'<div class="log-terminal"><div class="log-entry">[{datetime.now().strftime("%H:%M:%S")}] SUCCESS: Data synchronized.</div></div>', unsafe_allow_html=True)
+                    m4.metric("Status", "STABLE" if abs(p_change) < 2 else "VOLATILE")
 
-    elif terminal_mode == "📈 Thai Stock Predict & Analysis":
-        st.title("📈 THAI STOCK TECHNICAL PREDICT & ANALYSIS")
-        if analysis_data:
-            tabs = st.tabs([f"Analysis: {s}" for s in analysis_data.keys()])
-            for i, (symbol, d) in enumerate(analysis_data.items()):
-                with tabs[i]:
-                    st.markdown(f"### 🇹🇭 {symbol} - Predict Signal")
-                    st.markdown(f'<p class="market-header-sub">Stock Exchange of Thailand • Real Time Technical Signal • THB</p>', unsafe_allow_html=True)
-                    
-                    df = d['history'].to_frame()
-                    df['MA_S'] = df['Close'].rolling(window=ma_s_th).mean()
-                    df['MA_L'] = df['Close'].rolling(window=ma_l_th).mean()
-                    exp1 = df['Close'].ewm(span=12, adjust=False).mean(); exp2 = df['Close'].ewm(span=26, adjust=False).mean(); df['MACD'] = exp1 - exp2; df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-                    delta = df['Close'].diff(); gain = (delta.where(delta > 0, 0)).rolling(window=rsi_w_th).mean(); loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_w_th).mean(); df['RSI'] = 100 - (100 / (1 + (gain/loss)))
-                    
-                    c1, c2, c3, c4 = st.columns(4)
-                    curr_p = d['price']; prev_p = df['Close'].iloc[-2]; p_change = ((curr_p - prev_p) / prev_p) * 100; rsi_val = df['RSI'].iloc[-1]; trend_label = "📈 BULLISH" if df['MA_S'].iloc[-1] > df['MA_L'].iloc[-1] else "📉 BEARISH"
-                    c1.metric("Current Price", f"฿{curr_p:,.2f}", f"{p_change:+.2f}%")
-                    c2.metric("Trend Status", trend_label, delta_color="normal" if "BULL" in trend_label else "inverse")
-                    c3.metric("RSI Momentum", f"{rsi_val:.2f}", "Neutral" if 30 < rsi_val < 70 else "Extreme")
-                    macd_val = "BUY" if df['MACD'].iloc[-1] > df['Signal'].iloc[-1] else "SELL"
-                    c4.metric("MACD Signal", macd_val)
-                    
-                    # Chart
-                    fig_th = go.Figure()
-                    fig_th.add_trace(go.Scatter(x=df.index, y=df['Close'], name="Price", line=dict(color='#00ff88')))
-                    fig_th.add_trace(go.Scatter(x=df.index, y=df['MA_S'], name="MA Short", line=dict(color='#f1e05a', dash='dash')))
-                    fig_th.add_trace(go.Scatter(x=df.index, y=df['MA_L'], name="MA Long", line=dict(color='#da3633', dash='dot')))
-                    fig_th.update_layout(height=450, template="plotly_dark", margin=dict(l=0,r=0,t=20,b=0))
-                    st.plotly_chart(fig_th, use_container_width=True, key=f"th_trade_chart_{symbol}")
-                    
-                    # Deep Dive (เหมือน Global)
+                    st.subheader(f"📈 Price Performance: {symbol}")
+                    st.line_chart(d['history'].iloc[-252:], color="#00ff88")
+
                     st.divider()
                     st.subheader(f"📊 Deep Dive: {symbol} Financials & Performance")
-                    ret_1m = ((curr_p / df['Close'].iloc[-21]) - 1) * 100
-                    ret_6m = ((curr_p / df['Close'].iloc[-126]) - 1) * 100
-                    ret_1y = ((curr_p / df['Close'].iloc[-252]) - 1) * 100
+                    ret_1m = ((curr_p / d['history'].iloc[-21]) - 1) * 100
+                    ret_6m = ((curr_p / d['history'].iloc[-126]) - 1) * 100
+                    ret_1y = ((curr_p / d['history'].iloc[-252]) - 1) * 100
                     
-                    p1, p2 = st.columns([1, 2])
-                    with p1:
+                    p_col1, p_col2 = st.columns([1, 2])
+                    with p_col1:
                         st.markdown("**Performance Tracker**")
                         st.table(pd.DataFrame({"Period": ["1 Month", "6 Months", "1 Year"], "Return": [f"{ret_1m:+.2f}%", f"{ret_6m:+.2f}%", f"{ret_1y:+.2f}%"]}))
-                    with p2:
+                    with p_col2:
                         inf = d.get('info', {})
                         st.markdown("**Fundamental Highlights**")
                         f_col1, f_col2 = st.columns(2)
                         with f_col1:
                             st.write(f"🏢 **Full Name:** {inf.get('longName', symbol)}")
-                            st.write(f"💰 **Div Yield:** {inf.get('dividendYield', 0)*100:.2f}%" if inf.get('dividendYield') else "💰 **Dividend:** N/A")
+                            st.write(f"💰 **Dividend Yield:** {inf.get('dividendYield', 0)*100:.2f}%" if inf.get('dividendYield') else "💰 **Dividend:** N/A")
                             st.write(f"📈 **52W High:** ฿{inf.get('fiftyTwoWeekHigh', 0):,.2f}")
                         with f_col2:
                             st.write(f"🌎 **Sector:** {inf.get('sector', 'N/A')}")
-                            st.write(f"🏗️ **Industry:** {inf.get('industry', 'N/A')}")
+                            st.write(f"🏦 **Industry:** {inf.get('industry', 'N/A')}")
                             st.write(f"📉 **52W Low:** ฿{inf.get('fiftyTwoWeekLow', 0):,.2f}")
 
-                    # Recommendation Box (เหมือน Global)
-                    st.markdown('<div class="academic-box"><p class="academic-label">🔍 Terminal Trade Recommendation</p>', unsafe_allow_html=True)
-                    if "BULL" in trend_label and rsi_val < 65: st.success(f"🌟 **Strong Buy Signal:** {symbol} แสดงแนวโน้มขาขึ้นและราคายังมี Upside")
-                    elif "BEAR" in trend_label and rsi_val > 35: st.error(f"⚠️ **Bearish Alert:** {symbol} อยู่ในทิศทางขาลง แนะนำให้รอการกลับตัว")
-                    else: st.warning("🔄 **Neutral:** สัญญาณยังไม่ชัดเจน แนะนำให้รอดูการตัดกันของเส้น MA")
+                    st.markdown('<div class="academic-box">', unsafe_allow_html=True)
+                    st.markdown('<p class="academic-label">🔍 Terminal Trade Recommendation (THAI MARKET)</p>', unsafe_allow_html=True)
+                    if p_change > 0 and d['c_beta'] < 0.2:
+                        st.success(f"🌟 **Signal: BUY / ACCUMULATE** - {symbol} มีแนวโน้มราคาเป็นบวกและมีความเปราะบางต่อความเสี่ยงคาร์บอนต่ำ")
+                    elif p_change < -1 or d['c_beta'] > 0.4:
+                        st.error(f"⚠️ **Signal: REDUCE / SELL** - ราคามีแรงกดดันขาลงและมีความอ่อนไหวต่อปัจจัยภูมิอากาศสูง")
+                    else:
+                        st.warning(f"🔄 **Signal: HOLD / NEUTRAL** - ราคาวิ่งในกรอบแคบ แนะนำให้รอดูความชัดเจน")
                     st.markdown('</div>', unsafe_allow_html=True)
 
-    elif terminal_mode == "🌎 Global Technical Analysis":
-        st.title("🌎 GLOBAL MARKET TECHNICAL INTELLIGENCE")
-        if analysis_data:
-            tabs = st.tabs([f"Analysis: {s}" for s in analysis_data.keys()])
-            for i, (symbol, d) in enumerate(analysis_data.items()):
-                with tabs[i]:
-                    st.markdown(f"### 🌎 {symbol} - Global Market Report")
-                    st.markdown(f'<p class="market-header-sub">{d.get("info",{}).get("exchange","Global")} Price • USD</p>', unsafe_allow_html=True)
-                    df = d['history'].to_frame(); df['MA_S'] = df['Close'].rolling(window=g_ma_s).mean(); df['MA_L'] = df['Close'].rolling(window=g_ma_l).mean()
-                    exp1 = df['Close'].ewm(span=12, adjust=False).mean(); exp2 = df['Close'].ewm(span=26, adjust=False).mean(); df['MACD'] = exp1 - exp2; df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-                    delta = df['Close'].diff(); gain = (delta.where(delta > 0, 0)).rolling(window=g_rsi).mean(); loss = (-delta.where(delta < 0, 0)).rolling(window=g_rsi).mean(); df['RSI'] = 100 - (100 / (1 + (gain/loss)))
-                    c1, c2, c3, c4 = st.columns(4); curr_p = d['price']; prev_p = df['Close'].iloc[-2]; p_change = ((curr_p - prev_p) / prev_p) * 100; rsi_val = df['RSI'].iloc[-1]; trend_label = "📈 BULLISH" if df['MA_S'].iloc[-1] > df['MA_L'].iloc[-1] else "📉 BEARISH"
-                    c1.metric("Price", f"${curr_p:,.2f}", f"{p_change:+.2f}%"); c2.metric("Trend", trend_label); c3.metric("RSI", f"{rsi_val:.2f}"); c4.metric("MACD Signal", "BUY" if df['MACD'].iloc[-1] > df['Signal'].iloc[-1] else "SELL")
-                    st.line_chart(df[['Close', 'MA_S', 'MA_L']], color=["#00ff88", "#f1e05a", "#da3633"])
-                    st.divider(); st.subheader(f"📊 Deep Dive: {symbol} Financials"); p1, p2 = st.columns([1, 2]); ret_1y = ((curr_p / df['Close'].iloc[-252]) - 1) * 100
-                    with p1: st.table(pd.DataFrame({"Period": ["1Y Return"], "Value": [f"{ret_1y:+.2f}%"]}))
-                    with p2: inf = d.get('info', {}); st.write(f"🏢 **Full Name:** {inf.get('longName', 'N/A')}"); st.write(f"💰 **Div Yield:** {inf.get('dividendYield', 0)*100:.2f}%" if inf.get('dividendYield') else "💰 **Div Yield:** N/A"); st.write(f"📈 **52W High:** ${inf.get('fiftyTwoWeekHigh', 0):,.2f}")
-                    st.markdown('<div class="academic-box"><p class="academic-label">🔍 Recommendation</p>', unsafe_allow_html=True)
-                    if df['MA_S'].iloc[-1] > df['MA_L'].iloc[-1] and rsi_val < 65: st.success(f"🌟 **Strong Buy Signal:** {symbol} มีแนวโน้มดีและราคายังมี Upside")
-                    elif df['MA_S'].iloc[-1] < df['MA_L'].iloc[-1] and rsi_val > 35: st.error(f"⚠️ **Bearish Alert:** {symbol} อยู่ในทิศทางขาลง")
-                    else: st.warning("🔄 **Neutral:** สัญญาณยังไม่ชัดเจน"); st.markdown('</div>', unsafe_allow_html=True)
-else:
-    st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar เพื่อเริ่มต้นวิเคราะห์ข้อมูล")
+                    st.divider()
+                    st.subheader(f"📊 Market Intelligence: {symbol}")
+                    def get_val(key, style="{:,.2f}"):
+                        v = inf.get(key)
+                        if v is None or v == 0: return "N/A"
+                        try: return style.format(float(v))
+                        except: return str(v)
+                    m_c1, m_c2, m_c3 = st.columns(3); m_c4, m_c5, m_c6 = st.columns(3)
+                    with m_c1: st.markdown(f'<div class="market-card"><div class="market-label">Market Cap</div><div class="market-value">{get_val("marketCap", "{:,.0f}")}</div></div>', unsafe_allow_html=True)
+                    with m_c2: st.markdown(f'<div class="market-card"><div class="market-label">Trailing P/E</div><div class="market-value">{get_val("trailingPE")}</div></div>', unsafe_allow_html=True)
+                    with m_c3: st.markdown(f'<div class="market-card"><div class="market-label">Beta (5Y)</div><div class="market-value">{get_val("beta")}</div></div>', unsafe_allow_html=True)
+                    with m_c4: st.markdown(f'<div class="market-card"><div class="market-label">Profit Margin</div><div class="market-value">{get_val("profitMargins", "{:.2%}")}</div></div>', unsafe_allow_html=True)
+                    with m_c5: st.markdown(f'<div class="market-card"><div class="market-label">Div. Yield</div><div class="market-value">{get_val("dividendYield", "{:.2%}")}</div></div>', unsafe_allow_html=True)
+                    with m_c6: st.markdown(f'<div class="market-card"><div class="market-label">Debt/Equity</div><div class="market-value">{get_val("debtToEquity")}</div></div>', unsafe_allow_html=True)
+
+                    st.divider()
+                    st.subheader("🛡️ Comprehensive Climate Risk Matrix")
+                    de_raw = inf.get('debtToEquity'); de_ratio = float(de_raw) if de_raw and de_raw != 'N/A' else 100.0
+                    dynamic_trans = d['c_beta'] * 100 * tax_multiplier
+                    credit_risk = "High" if (de_ratio > 150 or abs(dynamic_trans) > 25) else "Low"
+                    op_risk = "High" if flood_risk > 60 else "Low"
+                    r1, r2, r3, r4 = st.columns(4)
+                    r1.warning(f"💳 Credit: {credit_risk}"); r2.error(f"🏗️ Operational: {op_risk}"); r3.info(f"💧 Liquidity: Low"); r4.success(f"⚖️ Liability: Low")
+
+                    st.markdown('<div class="academic-box">', unsafe_allow_html=True)
+                    st.markdown('<p class="academic-label">🔬 Quantitative Climate Risk Analytics (TCFD Framework)</p>', unsafe_allow_html=True)
+                    q1, q2, q3 = st.columns(3); climate_var = abs(dynamic_trans) * 0.1
+                    with q1: st.write(f"📊 **Sensitivity:** **{d['c_beta']:.4f}**")
+                    with q2: st.write(f"📉 **Climate VaR:** <span style='color:#ff4b4b;'>**{climate_var:,.2f}%**</span>", unsafe_allow_html=True)
+                    with q3: st.write(f"🏢 **Sector Vulnerability:** {'High' if abs(d['c_beta']) > 0.3 else 'Standard'}")
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = dynamic_trans, title={'text': "Transition Sensitivity"}, gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "white"}, 'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
+                        fig_gauge.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=50, b=0))
+                        st.plotly_chart(fig_gauge, use_container_width=True, key=f"th_gauge_{symbol}")
+                    with c2:
+                        raw_cap = inf.get('marketCap', 1e9); mkt_cap_mb = float(raw_cap)/1e6
+                        val_impact = (tax_price * 1000) / wacc / 1e6; adj_val = mkt_cap_mb - val_impact
+                        fig_water = go.Figure(go.Waterfall(orientation = "v", x = ["Initial", "Climate Loss", "Adjusted"], y = [mkt_cap_mb, -val_impact, adj_val], textposition = "outside", increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
+                        fig_water.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=20, b=0))
+                        st.plotly_chart(fig_water, use_container_width=True, key=f"th_water_{symbol}")
+
+                    if d['news']:
+                        st.subheader(f"📰 Intelligence Feed: {symbol}")
+                        for n in d['news']:
+                            st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}"); st.caption(f"🔗 [Link]({n.get('link')})")
+
+# ==========================================
+# MODULE 2: GLOBAL TECHNICAL ANALYSIS (ห้ามลบ/ย่อของเดิม)
+# ==========================================
+elif terminal_mode == "🌎 Global Technical Analysis":
+    with st.sidebar:
+        with st.expander("🔍 Global Stock Entry", expanded=True):
+            g1 = st.text_input("Global Stock 1", "AAPL")
+            g2 = st.text_input("Global Stock 2", "NVDA")
+            g3 = st.text_input("Global Stock 3", "TSLA")
+            global_tickers = [t.strip().upper() for t in [g1, g2, g3] if t.strip()]
+        
+        with st.expander("📈 Strategy Settings", expanded=True):
+            ma_s = st.slider("Short-Term MA", 5, 50, 20, help="เส้นค่าเฉลี่ยระยะสั้น ใช้ดูแนวโน้มปัจจุบัน")
+            ma_l = st.slider("Long-Term MA", 50, 200, 50, help="เส้นค่าเฉลี่ยระยะยาว ใช้เป็นแนวรับ-แนวต้านสำคัญ")
+            rsi_window = st.slider("RSI Window", 7, 30, 14, help="ดัชนีกำลังสัมพัทธ์ (Overbought > 70 / Oversold < 30)")
+            st.info("💡 **Golden Cross:** เกิดขึ้นเมื่อเส้นสั้นตัดเส้นยาวขึ้น บ่งบอกถึงจุดเริ่มต้นของขาขึ้น")
+
+    st.title("🌎 GLOBAL MARKET TECHNICAL INTELLIGENCE")
+    if not global_tickers:
+        st.info("💡 กรุณาระบุ Ticker หุ้นต่างประเทศเพื่อเริ่มการวิเคราะห์")
+    else:
+        g_data = fetch_pro_data(global_tickers, market_mode="Global")
+        if g_data:
+            g_tabs = st.tabs([f"Analysis: {s}" for s in g_data.keys()])
+            for i, (symbol, d) in enumerate(g_data.items()):
+                with g_tabs[i]:
+                    st.markdown(f"### 🌎 {symbol} - {d.get('info', {}).get('exchange', 'Global Exchange')}")
+                    st.markdown(f'<p class="market-header-sub">{d.get("info", {}).get("exchange", "NASDAQ")} Real Time Price • USD</p>', unsafe_allow_html=True)
+
+                    df = d['history'].to_frame()
+                    df['MA_Short'] = df['Close'].rolling(window=ma_s).mean()
+                    df['MA_Long'] = df['Close'].rolling(window=ma_l).mean()
+                    exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+                    exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+                    df['MACD'] = exp1 - exp2
+                    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+                    delta = df['Close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=rsi_window).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_window).mean()
+                    df['RSI'] = 100 - (100 / (1 + (gain/loss)))
+
+                    fig_global = go.Figure()
+                    fig_global.add_trace(go.Scatter(x=df.index, y=df['Close'], name="Price", line=dict(color='#00ff88', width=2)))
+                    fig_global.add_trace(go.Scatter(x=df.index, y=df['MA_Short'], name=f"MA {ma_s}", line=dict(color='#f1e05a', dash='dash')))
+                    fig_global.add_trace(go.Scatter(x=df.index, y=df['MA_Long'], name=f"MA {ma_l}", line=dict(color='#da3633', dash='dot')))
+                    fig_global.update_layout(height=450, template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
+                    st.plotly_chart(fig_global, use_container_width=True, key=f"g_chart_{symbol}")
+
+                    c1, c2, c3, c4 = st.columns(4)
+                    rsi_val = df['RSI'].iloc[-1]
+                    trend_label = "📈 BULLISH" if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] else "📉 BEARISH"
+                    c1.metric("Current Price", f"${d['price']:,.2f}", f"{((d['price']/df['Close'].iloc[-2])-1)*100:+.2f}%")
+                    c2.metric("Trend Status", trend_label, delta_color="normal" if "BULL" in trend_label else "inverse")
+                    c3.metric("RSI Momentum", f"{rsi_val:.2f}", "Neutral" if 30 < rsi_val < 70 else "Extreme")
+                    macd_val = "BUY" if df['MACD'].iloc[-1] > df['Signal'].iloc[-1] else "SELL"
+                    c4.metric("MACD Signal", macd_val)
+
+                    st.divider()
+                    st.subheader(f"📊 Deep Dive: {symbol} Financials & Performance")
+                    curr_p = d['price']
+                    ret_1m = ((curr_p / df['Close'].iloc[-21]) - 1) * 100
+                    ret_6m = ((curr_p / df['Close'].iloc[-126]) - 1) * 100
+                    ret_1y = ((curr_p / df['Close'].iloc[-252]) - 1) * 100
+                    
+                    p_col1, p_col2 = st.columns([1, 2])
+                    with p_col1:
+                        st.markdown("**Performance Tracker**")
+                        st.table(pd.DataFrame({"Period": ["1 Month", "6 Months", "1 Year"], "Return": [f"{ret_1m:+.2f}%", f"{ret_6m:+.2f}%", f"{ret_1y:+.2f}%"]}))
+                    with p_col2:
+                        inf = d.get('info', {})
+                        st.markdown("**Fundamental Highlights**")
+                        f_col1, f_col2 = st.columns(2)
+                        with f_col1:
+                            st.write(f"🏢 **Full Name:** {inf.get('longName', 'N/A')}")
+                            st.write(f"💰 **Div Yield:** {inf.get('dividendYield', 0)*100:.2f}%")
+                            st.write(f"📈 **52W High:** ${inf.get('fiftyTwoWeekHigh', 0):,.2f}")
+                        with f_col2:
+                            st.write(f"🌎 **Exchange:** {inf.get('exchange', 'N/A')}")
+                            st.write(f"🏗️ **Sector:** {inf.get('sector', 'N/A')}")
+                            st.write(f"📉 **52W Low:** ${inf.get('fiftyTwoWeekLow', 0):,.2f}")
+
+                    st.markdown('<div class="academic-box">', unsafe_allow_html=True)
+                    st.markdown('<p class="academic-label">🔍 Terminal Trade Recommendation</p>', unsafe_allow_html=True)
+                    if "BULL" in trend_label and rsi_val < 65: st.success(f"🌟 **Strong Buy Signal:** {symbol} แสดงแนวโน้มขาขึ้นและราคายังมี Upside")
+                    elif "BEAR" in trend_label and rsi_val > 35: st.error(f"⚠️ **Bearish Alert:** {symbol} อยู่ในทิศทางขาลง แนะนำให้ระวังแรงขาย")
+                    else: st.warning(f"🔄 **Neutral:** สัญญาณยังไม่ชัดเจน แนะนำให้รอดูการตัดกันของเส้น MA")
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                    if d['news']:
+                        st.subheader(f"📰 Global Intelligence: {symbol}")
+                        for n in d['news']:
+                            st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}"); st.caption(f"🔗 [Link]({n.get('link')})")
+
+# ==========================================
+# MODULE 3: THAI TECHNICAL ANALYSIS (หน้าใหม่ที่เพิ่มเข้ามา)
+# ==========================================
+elif terminal_mode == "📈 Thai Technical Analysis":
+    with st.sidebar:
+        with st.expander("🔍 Thai Stock Selection", expanded=True):
+            t1_th = st.text_input("Thai Stock 1", "CPALL.BK")
+            t2_th = st.text_input("Thai Stock 2", "AOT.BK")
+            t3_th = st.text_input("Thai Stock 3", "")
+            th_tr_tickers = [t.strip().upper() for t in [t1_th, t2_th, t3_th] if t.strip()]
+        
+        with st.expander("📈 Strategy Settings", expanded=True):
+            ma_s_th = st.slider("Short MA", 5, 50, 20)
+            ma_l_th = st.slider("Long MA", 50, 200, 50)
+            rsi_w_th = st.slider("RSI Period", 7, 30, 14)
+
+    st.title("📈 THAI STOCK TECHNICAL TRADING TERMINAL")
+    if not th_tr_tickers:
+        st.info("💡 กรุณาระบุ Ticker หุ้นไทย (เช่น KBANK.BK) เพื่อเริ่มวิเคราะห์")
+    else:
+        th_data = fetch_pro_data(th_tr_tickers, market_mode="TH")
+        if th_data:
+            th_tabs = st.tabs([f"Trading: {s}" for s in th_data.keys()])
+            for i, (symbol, d) in enumerate(th_data.items()):
+                with th_tabs[i]:
+                    # ส่วนหัวแบบภาพ 2
+                    st.markdown(f"### 🇹🇭 {symbol} - Stock Exchange of Thailand")
+                    st.markdown(f'<p class="market-header-sub">SET Real Time Price • THB</p>', unsafe_allow_html=True)
+
+                    df = d['history'].to_frame()
+                    df['MA_Short'] = df['Close'].rolling(window=ma_s_th).mean()
+                    df['MA_Long'] = df['Close'].rolling(window=ma_l_th).mean()
+                    exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+                    exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+                    df['MACD'] = exp1 - exp2
+                    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+                    delta = df['Close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=rsi_w_th).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_w_th).mean()
+                    df['RSI'] = 100 - (100 / (1 + (gain/loss)))
+
+                    fig_th = go.Figure()
+                    fig_th.add_trace(go.Scatter(x=df.index, y=df['Close'], name="Price", line=dict(color='#00ff88')))
+                    fig_th.add_trace(go.Scatter(x=df.index, y=df['MA_Short'], name=f"MA {ma_s_th}", line=dict(color='#f1e05a', dash='dash')))
+                    fig_th.add_trace(go.Scatter(x=df.index, y=df['MA_Long'], name=f"MA {ma_l_th}", line=dict(color='#da3633', dash='dot')))
+                    fig_th.update_layout(height=450, template="plotly_dark", margin=dict(l=0,r=0,t=20,b=0))
+                    st.plotly_chart(fig_th, use_container_width=True, key=f"th_tr_chart_{symbol}")
+
+                    c1, c2, c3, c4 = st.columns(4)
+                    rsi_v = df['RSI'].iloc[-1]
+                    trend_v = "📈 BULLISH" if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] else "📉 BEARISH"
+                    c1.metric("Price", f"฿{d['price']:,.2f}", f"{((d['price']/df['Close'].iloc[-2])-1)*100:+.2f}%")
+                    c2.metric("Trend Status", trend_v)
+                    c3.metric("RSI", f"{rsi_v:.2f}")
+                    macd_v = "BUY" if df['MACD'].iloc[-1] > df['Signal'].iloc[-1] else "SELL"
+                    c4.metric("MACD Signal", macd_v)
+
+                    st.divider()
+                    st.subheader(f"📊 Performance & Fundamentals: {symbol}")
+                    curr_p = d['price']
+                    ret_1m = ((curr_p / df['Close'].iloc[-21]) - 1) * 100
+                    ret_1y = ((curr_p / df['Close'].iloc[-252]) - 1) * 100
+                    p1, p2 = st.columns([1, 2])
+                    with p1:
+                        st.table(pd.DataFrame({"Period": ["1 Month", "1 Year"], "Return": [f"{ret_1m:+.2f}%", f"{ret_1y:+.2f}%"]}))
+                    with p2:
+                        inf = d.get('info', {})
+                        st.write(f"🏢 **Full Name:** {inf.get('longName', symbol)}")
+                        st.write(f"💰 **Div Yield:** {inf.get('dividendYield', 0)*100:.2f}%" if inf.get('dividendYield') else "💰 **Dividend:** N/A")
+                        st.write(f"📈 **52W High:** ฿{inf.get('fiftyTwoWeekHigh', 0):,.2f}")
+
+                    st.markdown('<div class="academic-box">', unsafe_allow_html=True)
+                    st.markdown('<p class="academic-label">🔍 Thai Trade recommendation</p>', unsafe_allow_html=True)
+                    if "BULL" in trend_v and rsi_v < 65: st.success(f"✅ **Signal: BUY** - หุ้น {symbol} อยู่ในแนวโน้มขาขึ้นและราคายังมี Upside")
+                    elif "BEAR" in trend_v and rsi_v > 35: st.error(f"⚠️ **Signal: SELL / WAIT** - แนวโน้มหลักเป็นขาลง แนะนำให้รอสัญญาณกลับตัว")
+                    else: st.warning("🔄 **Signal: HOLD** - สัญญาณทางเทคนิคยังไม่ชัดเจน แนะนำให้รอดูการตัดกันของ MA")
+                    st.markdown('</div>', unsafe_allow_html=True)
 
 # --- FOOTER ---
-st.markdown(f'<div class="footer">🏛️ Climate & Financial Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="footer">🏛️ Climate & Global Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
