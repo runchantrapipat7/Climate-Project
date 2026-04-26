@@ -43,7 +43,6 @@ st.markdown("""
     .log-terminal { background: #000000 !important; border: 1px solid #2ea043 !important; border-radius: 8px; font-family: 'Courier New', Courier, monospace !important; padding: 15px; }
     .log-entry { color: #00ff88; font-size: 0.85rem; margin-bottom: 5px; }
     
-    /* Academic Section Style */
     .academic-box { 
         background: rgba(0, 255, 136, 0.03); 
         border: 1px dashed rgba(0, 255, 136, 0.3); 
@@ -53,7 +52,6 @@ st.markdown("""
     }
     .academic-label { color: #00ff88; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
     
-    /* Market Summary Modern Card Style */
     .market-card {
         background: rgba(255, 255, 255, 0.03);
         border: 1px solid rgba(0, 255, 136, 0.1);
@@ -69,19 +67,8 @@ st.markdown("""
         transform: translateY(-3px);
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
     }
-    .market-label {
-        color: #8b949e;
-        font-size: 0.72rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 8px;
-    }
-    .market-value {
-        color: #ffffff;
-        font-size: 1.15rem;
-        font-weight: 600;
-        font-family: 'Inter', sans-serif;
-    }
+    .market-label { color: #8b949e; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .market-value { color: #ffffff; font-size: 1.15rem; font-weight: 600; font-family: 'Inter', sans-serif; }
 
     .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: rgba(13, 17, 23, 0.95); color: #8b949e; text-align: center; padding: 10px; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999; }
     .block-container { padding-bottom: 100px; }
@@ -107,7 +94,7 @@ def fetch_pro_data(ticker_list, market_mode="TH"):
     for symbol in ticker_list:
         try:
             t_obj = yf.Ticker(symbol)
-            hist = t_obj.history(period="1y")['Close'].ffill()
+            hist = t_obj.history(period="2y")['Close'].ffill() # ดึง 2 ปีเพื่อให้คำนวณ Return ย้อนหลังได้แม่นยำ
             if hist.empty: continue
             
             info = {}
@@ -196,7 +183,7 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
             for i, (symbol, d) in enumerate(analysis.items()):
                 with tabs[i]:
                     st.subheader(f"📈 Price Performance: {symbol}")
-                    st.line_chart(d['history'], color="#00ff88")
+                    st.line_chart(d['history'].iloc[-252:], color="#00ff88") # แสดงผล 1 ปีย้อนหลัง
 
                     st.subheader(f"📊 Market Intelligence: {symbol}")
                     inf = d.get('info', {})
@@ -263,7 +250,7 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                     else: st.write("No recent news found.")
 
 # ==========================================
-# MODULE 2: GLOBAL TECHNICAL ANALYSIS (แก้ไขเพิ่มคำอธิบายใน Strategy Settings)
+# MODULE 2: GLOBAL TECHNICAL ANALYSIS (เพิ่ม Deep Dive ข้อมูลรายตัว)
 # ==========================================
 elif terminal_mode == "🌎 Global Technical Analysis":
     with st.sidebar:
@@ -274,39 +261,39 @@ elif terminal_mode == "🌎 Global Technical Analysis":
             global_tickers = [t.strip().upper() for t in [g1, g2, g3] if t.strip()]
         
         with st.expander("📈 Strategy Settings", expanded=True):
-            # --- ส่วนที่เพิ่มคำอธิบาย (Help Text) ---
-            ma_s = st.slider(
-                "Short-Term MA", 5, 50, 20, 
-                help="เส้นค่าเฉลี่ยเคลื่อนที่ระยะสั้น (เช่น 20 วัน) ใช้เพื่อดูแนวโน้มราคาปัจจุบันและหาจุดตัดเพื่อส่งสัญญาณซื้อขาย"
-            )
-            ma_l = st.slider(
-                "Long-Term MA", 50, 200, 50, 
-                help="เส้นค่าเฉลี่ยเคลื่อนที่ระยะยาว (เช่น 50 หรือ 200 วัน) ใช้เป็นแนวรับ-แนวต้านสำคัญเพื่อยืนยันแนวโน้มขาขึ้นหรือขาลงขนาดใหญ่"
-            )
-            rsi_window = st.slider(
-                "RSI Window", 7, 30, 14, 
-                help="Relative Strength Index (RSI) ใช้ดัชนีกำลังสัมพัทธ์เพื่อดูสภาวะการซื้อมากเกินไป (Overbought > 70) หรือขายมากเกินไป (Oversold < 30)"
-            )
-            st.info("💡 **Tip:** เมื่อ Short MA ตัดขึ้นเหนือ Long MA จะเกิดสัญญาณ 'Golden Cross' ซึ่งบ่งบอกถึงแนวโน้มขาขึ้น")
+            ma_s = st.slider("Short-Term MA", 5, 50, 20, help="เส้นค่าเฉลี่ยระยะสั้น ใช้ดูแนวโน้มปัจจุบัน")
+            ma_l = st.slider("Long-Term MA", 50, 200, 50, help="เส้นค่าเฉลี่ยระยะยาว ใช้เป็นแนวรับ-แนวต้านสำคัญ")
+            rsi_window = st.slider("RSI Window", 7, 30, 14, help="ดัชนีกำลังสัมพัทธ์ (Overbought > 70 / Oversold < 30)")
+            st.info("💡 **Golden Cross:** เกิดขึ้นเมื่อเส้นสั้นตัดเส้นยาวขึ้น บ่งบอกถึงจุดเริ่มต้นของขาขึ้น")
 
     st.title("🌎 GLOBAL MARKET TECHNICAL INTELLIGENCE")
     if not global_tickers:
-        st.info("💡 กรุณาระบุ Ticker หุ้นต่างประเทศ (เช่น TSLA, MSFT, 7203.T)")
+        st.info("💡 กรุณาระบุ Ticker หุ้นต่างประเทศเพื่อเริ่มการวิเคราะห์")
     else:
         g_data = fetch_pro_data(global_tickers, market_mode="Global")
         if g_data:
-            g_tabs = st.tabs([f"Market Trend: {s}" for s in g_data.keys()])
+            g_tabs = st.tabs([f"Analysis: {s}" for s in g_data.keys()])
             for i, (symbol, d) in enumerate(g_data.items()):
                 with g_tabs[i]:
+                    # 1. ข้อมูลประวัติราคาและ Technical Indicators
                     df = d['history'].to_frame()
                     df['MA_Short'] = df['Close'].rolling(window=ma_s).mean()
                     df['MA_Long'] = df['Close'].rolling(window=ma_l).mean()
+                    
+                    # MACD Calculation
+                    exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+                    exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+                    df['MACD'] = exp1 - exp2
+                    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+                    
+                    # RSI Calculation
                     delta = df['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=rsi_window).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_window).mean()
                     rs = gain / loss
                     df['RSI'] = 100 - (100 / (1 + rs))
 
+                    # 2. Main Chart
                     fig_global = go.Figure()
                     fig_global.add_trace(go.Scatter(x=df.index, y=df['Close'], name="Price", line=dict(color='#00ff88', width=2)))
                     fig_global.add_trace(go.Scatter(x=df.index, y=df['MA_Short'], name=f"MA {ma_s}", line=dict(color='#f1e05a', dash='dash')))
@@ -314,47 +301,70 @@ elif terminal_mode == "🌎 Global Technical Analysis":
                     fig_global.update_layout(height=450, template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
                     st.plotly_chart(fig_global, use_container_width=True)
 
-                    c1, c2, c3 = st.columns(3)
+                    # 3. Status Metric Row
+                    c1, c2, c3, c4 = st.columns(4)
                     curr_price = df['Close'].iloc[-1]
-                    prev_price = df['Close'].iloc[-2]
-                    price_change = ((curr_price - prev_price) / prev_price) * 100
+                    price_change = ((curr_price - df['Close'].iloc[-2]) / df['Close'].iloc[-2]) * 100
+                    rsi_val = df['RSI'].iloc[-1]
+                    trend_label = "📈 BULLISH" if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] else "📉 BEARISH"
                     
-                    with c1:
-                        st.markdown('<div class="market-card">', unsafe_allow_html=True)
-                        st.markdown('<p class="market-label">Trend Status</p>', unsafe_allow_html=True)
-                        trend_label = "📈 BULLISH" if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] else "📉 BEARISH"
-                        st.markdown(f'<p class="market-value" style="color:{"#00ff88" if "BULL" in trend_label else "#da3633"}">{trend_label}</p>', unsafe_allow_html=True)
-                        st.markdown('</div>', unsafe_allow_html=True)
+                    with c1: st.metric("Current Price", f"${curr_price:,.2f}", f"{price_change:+.2f}%")
+                    with c2: st.metric("Trend Status", trend_label, delta_color="normal" if "BULL" in trend_label else "inverse")
+                    with c3: st.metric("RSI Momentum", f"{rsi_val:.2f}", "Overbought" if rsi_val > 70 else ("Oversold" if rsi_val < 30 else "Neutral"))
+                    with c4:
+                        macd_sig = "BUY" if df['MACD'].iloc[-1] > df['Signal'].iloc[-1] else "SELL"
+                        st.metric("MACD Signal", macd_sig)
+
+                    # --- [เพิ่มใหม่: Deep Dive Data & Fundamentals] ---
+                    st.divider()
+                    st.subheader(f"📊 Deep Dive: {symbol} Financials & Performance")
                     
-                    with c2:
-                        st.markdown('<div class="market-card">', unsafe_allow_html=True)
-                        st.markdown('<p class="market-label">Momentum (RSI)</p>', unsafe_allow_html=True)
-                        rsi_val = df['RSI'].iloc[-1]
-                        rsi_color = "#f1e05a" if 30 < rsi_val < 70 else ("#da3633" if rsi_val >= 70 else "#00ff88")
-                        st.markdown(f'<p class="market-value" style="color:{rsi_color}">{rsi_val:.2f}</p>', unsafe_allow_html=True)
-                        st.markdown('</div>', unsafe_allow_html=True)
+                    # ตารางสรุปผลตอบแทน
+                    ret_1m = ((curr_price / df['Close'].iloc[-21]) - 1) * 100
+                    ret_6m = ((curr_price / df['Close'].iloc[-126]) - 1) * 100
+                    ret_1y = ((curr_price / df['Close'].iloc[-252]) - 1) * 100
+                    
+                    perf_c1, perf_c2 = st.columns([1, 2])
+                    
+                    with perf_c1:
+                        st.markdown("**Performance Tracker**")
+                        perf_df = pd.DataFrame({
+                            "Period": ["1 Month", "6 Months", "1 Year"],
+                            "Return": [f"{ret_1m:+.2f}%", f"{ret_6m:+.2f}%", f"{ret_1y:+.2f}%"]
+                        })
+                        st.table(perf_df)
 
-                    with c3:
-                        st.markdown('<div class="market-card">', unsafe_allow_html=True)
-                        st.markdown('<p class="market-label">Price 24h Change</p>', unsafe_allow_html=True)
-                        st.markdown(f'<p class="market-value">{price_change:+.2f}%</p>', unsafe_allow_html=True)
-                        st.markdown('</div>', unsafe_allow_html=True)
+                    with perf_c2:
+                        inf = d.get('info', {})
+                        st.markdown("**Fundamental Highlights**")
+                        f_col1, f_col2 = st.columns(2)
+                        with f_col1:
+                            st.write(f"🏢 **Full Name:** {inf.get('longName', 'N/A')}")
+                            st.write(f"💰 **Dividend Yield:** {inf.get('dividendYield', 0)*100:.2f}%" if inf.get('dividendYield') else "💰 **Dividend:** N/A")
+                            st.write(f"📈 **52 Week High:** ${inf.get('fiftyTwoWeekHigh', 0):,.2f}")
+                        with f_col2:
+                            st.write(f"🌎 **Exchange:** {inf.get('exchange', 'N/A')}")
+                            st.write(f"🏢 **Sector:** {inf.get('sector', 'N/A')}")
+                            st.write(f"📉 **52 Week Low:** ${inf.get('fiftyTwoWeekLow', 0):,.2f}")
 
+                    # สัญญาณสรุปแบบทางการ
                     st.markdown('<div class="academic-box">', unsafe_allow_html=True)
-                    st.markdown('<p class="academic-label">🔍 Executive Summary & Trade Signal</p>', unsafe_allow_html=True)
-                    if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] and rsi_val < 70:
-                        st.write("✅ **Signal: BUY / ACCUMULATE** - แนวโน้มหลักเป็นขาขึ้นและราคายังไม่เข้าเขตซื้อมากเกินไป (Overbought)")
-                    elif df['MA_Short'].iloc[-1] < df['MA_Long'].iloc[-1] and rsi_val > 30:
-                        st.write("⚠️ **Signal: SELL / WAIT** - แนวโน้มหลักเป็นขาลงและกำลังเสียแรงส่งทางราคา")
+                    st.markdown('<p class="academic-label">🔍 Terminal Trade Recommendation</p>', unsafe_allow_html=True)
+                    if "BULL" in trend_label and rsi_val < 65:
+                        st.success(f"🌟 **Strong Buy Signal:** {symbol} แสดงแนวโน้มขาขึ้นที่แข็งแกร่งและยังมีช่องว่างให้ราคาขยับขึ้น (Upside) ก่อนเข้าเขต Overbought")
+                    elif "BEAR" in trend_label and rsi_val > 35:
+                        st.error(f"⚠️ **Bearish Alert:** {symbol} อยู่ในทิศทางขาลงอย่างชัดเจน แนะนำให้รอดูสถานการณ์จนกว่าราคาจะสร้างฐานใหม่")
                     else:
-                        st.write("🔄 **Signal: NEUTRAL** - ตลาดอยู่ในภาวะเลือกทางหรือรอปัจจัยใหม่")
+                        st.warning(f"🔄 **Neutral / Sideways:** สัญญาณทางเทคนิคยังไม่ชัดเจน แนะนำให้รอการยืนยันจากจุดตัดของเส้นค่าเฉลี่ย (MA Crossover)")
                     st.markdown('</div>', unsafe_allow_html=True)
 
                     st.divider()
-                    st.subheader(f"📰 Global Intelligence: {symbol}")
-                    for n in d['news']:
-                        st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}")
-                        st.caption(f"🔗 [Source]({n.get('link')})")
+                    st.subheader(f"📰 Intelligence Feed: {symbol}")
+                    if d['news']:
+                        for n in d['news']:
+                            st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}")
+                            st.caption(f"🔗 [Link]({n.get('link')})")
+                    else: st.write("No recent news found.")
 
-# --- FOOTER (คงเดิม) ---
+# --- FOOTER ---
 st.markdown(f'<div class="footer">🏛️ Climate & Global Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
