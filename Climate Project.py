@@ -132,7 +132,7 @@ def fetch_pro_data(ticker_list, market_mode="TH"):
     return full_res
 
 # ==========================================
-# MODULE 1: THAI CLIMATE RISK (แก้ไข Error Duplicate ID)
+# MODULE 1: THAI CLIMATE RISK (เพิ่ม Recommendation & Deep Dive ห้ามลบของเดิม)
 # ==========================================
 if terminal_mode == "🇹🇭 Thai Climate Risk":
     @st.cache_data(ttl=3600)
@@ -180,6 +180,7 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
             tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
             for i, (symbol, d) in enumerate(analysis.items()):
                 with tabs[i]:
+                    # หัวตลาดแบบหุ้นไทย
                     st.markdown(f"### 🇹🇭 {symbol} - Stock Exchange of Thailand")
                     st.markdown(f'<p class="market-header-sub">SET - Thailand Real Time Price • THB</p>', unsafe_allow_html=True)
 
@@ -195,6 +196,7 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                     st.subheader(f"📈 Price Performance: {symbol}")
                     st.line_chart(d['history'].iloc[-252:], color="#00ff88")
 
+                    # --- [เพิ่มใหม่] ส่วน Deep Dive & Performance สำหรับหุ้นไทย ---
                     st.divider()
                     st.subheader(f"📊 Deep Dive: {symbol} Financials & Performance")
                     ret_1m = ((curr_p / d['history'].iloc[-21]) - 1) * 100
@@ -218,6 +220,19 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                             st.write(f"🏦 **Industry:** {inf.get('industry', 'N/A')}")
                             st.write(f"📉 **52W Low:** ฿{inf.get('fiftyTwoWeekLow', 0):,.2f}")
 
+                    # --- [เพิ่มใหม่] Terminal Trade Recommendation สำหรับหุ้นไทย ---
+                    st.markdown('<div class="academic-box">', unsafe_allow_html=True)
+                    st.markdown('<p class="academic-label">🔍 Terminal Trade Recommendation (THAI MARKET)</p>', unsafe_allow_html=True)
+                    # ตรรกะวิเคราะห์: ดู Trend ราคา + Climate Sensitivity
+                    if p_change > 0 and d['c_beta'] < 0.2:
+                        st.success(f"🌟 **Signal: BUY / ACCUMULATE** - {symbol} มีแนวโน้มราคาเป็นบวกและมีความเปราะบางต่อความเสี่ยงคาร์บอนต่ำ (Low Transition Risk)")
+                    elif p_change < -1 or d['c_beta'] > 0.4:
+                        st.error(f"⚠️ **Signal: REDUCE / SELL** - ราคามีแรงกดดันขาลงและมีความอ่อนไหวต่อปัจจัยนโยบายภูมิอากาศสูง (High Climate Sensitivity)")
+                    else:
+                        st.warning(f"🔄 **Signal: HOLD / NEUTRAL** - ราคาวิ่งในกรอบแคบ แนะนำให้ถือครองเพื่อรอดูความชัดเจนของทิศทางตลาด")
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                    # --- ส่วนเดิม Market Intelligence Grid ---
                     st.divider()
                     st.subheader(f"📊 Market Intelligence: {symbol}")
                     def get_val(key, style="{:,.2f}"):
@@ -233,6 +248,7 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                     with m_c5: st.markdown(f'<div class="market-card"><div class="market-label">Div. Yield</div><div class="market-value">{get_val("dividendYield", "{:.2%}")}</div></div>', unsafe_allow_html=True)
                     with m_c6: st.markdown(f'<div class="market-card"><div class="market-label">Debt/Equity</div><div class="market-value">{get_val("debtToEquity")}</div></div>', unsafe_allow_html=True)
 
+                    # --- ส่วนเดิม Climate Risk Analytics ---
                     st.divider()
                     st.subheader("🛡️ Comprehensive Climate Risk Matrix")
                     de_raw = inf.get('debtToEquity'); de_ratio = float(de_raw) if de_raw and de_raw != 'N/A' else 100.0
@@ -254,14 +270,12 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                     with c1:
                         fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = dynamic_trans, title={'text': "Transition Sensitivity"}, gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "white"}, 'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
                         fig_gauge.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=50, b=0))
-                        # เพิ่ม Key เพื่อแก้ Duplicate ID
                         st.plotly_chart(fig_gauge, use_container_width=True, key=f"th_gauge_{symbol}")
                     with c2:
                         raw_cap = inf.get('marketCap', 1e9); mkt_cap_mb = float(raw_cap)/1e6
                         val_impact = (tax_price * 1000) / wacc / 1e6; adj_val = mkt_cap_mb - val_impact
                         fig_water = go.Figure(go.Waterfall(orientation = "v", x = ["Initial", "Climate Loss", "Adjusted"], y = [mkt_cap_mb, -val_impact, adj_val], textposition = "outside", increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
                         fig_water.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=20, b=0))
-                        # เพิ่ม Key เพื่อแก้ Duplicate ID
                         st.plotly_chart(fig_water, use_container_width=True, key=f"th_water_{symbol}")
 
                     if d['news']:
@@ -270,7 +284,7 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                             st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}"); st.caption(f"🔗 [Link]({n.get('link')})")
 
 # ==========================================
-# MODULE 2: GLOBAL TECHNICAL ANALYSIS
+# MODULE 2: GLOBAL TECHNICAL ANALYSIS (รักษาไว้ครบถ้วนตามเดิม)
 # ==========================================
 elif terminal_mode == "🌎 Global Technical Analysis":
     with st.sidebar:
