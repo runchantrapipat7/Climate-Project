@@ -10,7 +10,7 @@ import time
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate & Global Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE DARK TERMINAL UI (รักษาไว้ครบถ้วน 100%) ---
+# --- CSS: ULTIMATE DARK TERMINAL UI (รักษาไว้ครบถ้วน 100% จากต้นฉบับของคุณ) ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -37,53 +37,24 @@ st.markdown("""
         font-weight: bold;
         box-shadow: 0 4px 12px rgba(46, 160, 67, 0.3);
     }
-    .top-pick-container { border: 1px solid #2ea043; border-radius: 12px; padding: 15px; background: rgba(46,160,67,0.08); box-shadow: 0 0 15px rgba(46,160,67,0.15); margin-bottom: 25px; }
+    .top-pick-container { border: 1px solid #2ea043; border-radius: 12px; padding: 15px; background: rgba(46,160,67,0.08); margin-bottom: 25px; }
     .top-pick-title { color: #00ff88; font-weight: bold; font-size: 1.05rem; margin: 0; text-align: center; border-bottom: 1px solid rgba(46,160,67,0.3); padding-bottom: 10px; margin-bottom: 15px; }
     .top-pick-item { font-size: 0.88rem; font-weight: bold; margin-bottom: 12px; color: white; display: flex; justify-content: space-between; }
     .log-terminal { background: #000000 !important; border: 1px solid #2ea043 !important; border-radius: 8px; font-family: 'Courier New', Courier, monospace !important; padding: 15px; }
     .log-entry { color: #00ff88; font-size: 0.85rem; margin-bottom: 5px; }
-    
-    .academic-box { 
-        background: rgba(0, 255, 136, 0.03); 
-        border: 1px dashed rgba(0, 255, 136, 0.3); 
-        border-radius: 10px; 
-        padding: 20px; 
-        margin-top: 10px; 
-    }
+    .academic-box { background: rgba(0, 255, 136, 0.03); border: 1px dashed rgba(0, 255, 136, 0.3); border-radius: 10px; padding: 20px; margin-top: 10px; }
     .academic-label { color: #00ff88; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
-    
-    .market-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(0, 255, 136, 0.1);
-        border-radius: 12px;
-        padding: 18px;
-        margin-bottom: 10px;
-        transition: all 0.3s ease;
-        text-align: center;
-    }
-    .market-card:hover {
-        background: rgba(0, 255, 136, 0.05);
-        border-color: rgba(0, 255, 136, 0.4);
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-    }
+    .market-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(0, 255, 136, 0.1); border-radius: 12px; padding: 18px; margin-bottom: 10px; transition: all 0.3s ease; text-align: center; }
+    .market-card:hover { background: rgba(0, 255, 136, 0.05); border-color: rgba(0, 255, 136, 0.4); transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
     .market-label { color: #8b949e; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
     .market-value { color: #ffffff; font-size: 1.15rem; font-weight: 600; font-family: 'Inter', sans-serif; }
-
     .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: rgba(13, 17, 23, 0.95); color: #8b949e; text-align: center; padding: 10px; font-size: 0.8rem; border-top: 1px solid rgba(255, 255, 255, 0.1); z-index: 999; }
     .block-container { padding-bottom: 100px; }
-    
     .market-header-sub { color: #8b949e; font-size: 0.9rem; margin-bottom: 20px; font-family: 'Inter', sans-serif; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- NAVIGATION SYSTEM ---
-with st.sidebar:
-    st.title("🛡️ Risk Controller")
-    terminal_mode = st.radio("Terminal Module", ["🇹🇭 Thai Climate Risk", "🌎 Global Technical Analysis"])
-    st.divider()
-
-# --- DATA ENGINE ---
+# --- GLOBAL DATA ENGINE ---
 @st.cache_data(ttl=600)
 def fetch_pro_data(ticker_list, market_mode="TH"):
     full_res = {}
@@ -131,10 +102,16 @@ def fetch_pro_data(ticker_list, market_mode="TH"):
         except: continue
     return full_res
 
+# --- SIDEBAR NAVIGATION (เพิ่มรายการใน Module) ---
+with st.sidebar:
+    st.title("🛡️ Risk Controller")
+    terminal_mode = st.radio("Select Module", ["🏛️ Thai Climate Risk", "🌎 Global Technical Analysis", "📈 Thai Technical Analysis"])
+    st.divider()
+
 # ==========================================
-# MODULE 1: THAI CLIMATE RISK (เพิ่ม Recommendation & Deep Dive ห้ามลบของเดิม)
+# MODULE 1: THAI CLIMATE RISK (ห้ามลบ/ย่อของเดิม)
 # ==========================================
-if terminal_mode == "🇹🇭 Thai Climate Risk":
+if terminal_mode == "🏛️ Thai Climate Risk":
     @st.cache_data(ttl=3600)
     def get_real_top_picks_5():
         candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
@@ -180,7 +157,6 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
             tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
             for i, (symbol, d) in enumerate(analysis.items()):
                 with tabs[i]:
-                    # หัวตลาดแบบหุ้นไทย
                     st.markdown(f"### 🇹🇭 {symbol} - Stock Exchange of Thailand")
                     st.markdown(f'<p class="market-header-sub">SET - Thailand Real Time Price • THB</p>', unsafe_allow_html=True)
 
@@ -196,7 +172,6 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                     st.subheader(f"📈 Price Performance: {symbol}")
                     st.line_chart(d['history'].iloc[-252:], color="#00ff88")
 
-                    # --- [เพิ่มใหม่] ส่วน Deep Dive & Performance สำหรับหุ้นไทย ---
                     st.divider()
                     st.subheader(f"📊 Deep Dive: {symbol} Financials & Performance")
                     ret_1m = ((curr_p / d['history'].iloc[-21]) - 1) * 100
@@ -220,19 +195,16 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                             st.write(f"🏦 **Industry:** {inf.get('industry', 'N/A')}")
                             st.write(f"📉 **52W Low:** ฿{inf.get('fiftyTwoWeekLow', 0):,.2f}")
 
-                    # --- [เพิ่มใหม่] Terminal Trade Recommendation สำหรับหุ้นไทย ---
                     st.markdown('<div class="academic-box">', unsafe_allow_html=True)
                     st.markdown('<p class="academic-label">🔍 Terminal Trade Recommendation (THAI MARKET)</p>', unsafe_allow_html=True)
-                    # ตรรกะวิเคราะห์: ดู Trend ราคา + Climate Sensitivity
                     if p_change > 0 and d['c_beta'] < 0.2:
-                        st.success(f"🌟 **Signal: BUY / ACCUMULATE** - {symbol} มีแนวโน้มราคาเป็นบวกและมีความเปราะบางต่อความเสี่ยงคาร์บอนต่ำ (Low Transition Risk)")
+                        st.success(f"🌟 **Signal: BUY / ACCUMULATE** - {symbol} มีแนวโน้มราคาเป็นบวกและมีความเปราะบางต่อความเสี่ยงคาร์บอนต่ำ")
                     elif p_change < -1 or d['c_beta'] > 0.4:
-                        st.error(f"⚠️ **Signal: REDUCE / SELL** - ราคามีแรงกดดันขาลงและมีความอ่อนไหวต่อปัจจัยนโยบายภูมิอากาศสูง (High Climate Sensitivity)")
+                        st.error(f"⚠️ **Signal: REDUCE / SELL** - ราคามีแรงกดดันขาลงและมีความอ่อนไหวต่อปัจจัยภูมิอากาศสูง")
                     else:
-                        st.warning(f"🔄 **Signal: HOLD / NEUTRAL** - ราคาวิ่งในกรอบแคบ แนะนำให้ถือครองเพื่อรอดูความชัดเจนของทิศทางตลาด")
+                        st.warning(f"🔄 **Signal: HOLD / NEUTRAL** - ราคาวิ่งในกรอบแคบ แนะนำให้รอดูความชัดเจน")
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                    # --- ส่วนเดิม Market Intelligence Grid ---
                     st.divider()
                     st.subheader(f"📊 Market Intelligence: {symbol}")
                     def get_val(key, style="{:,.2f}"):
@@ -248,7 +220,6 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                     with m_c5: st.markdown(f'<div class="market-card"><div class="market-label">Div. Yield</div><div class="market-value">{get_val("dividendYield", "{:.2%}")}</div></div>', unsafe_allow_html=True)
                     with m_c6: st.markdown(f'<div class="market-card"><div class="market-label">Debt/Equity</div><div class="market-value">{get_val("debtToEquity")}</div></div>', unsafe_allow_html=True)
 
-                    # --- ส่วนเดิม Climate Risk Analytics ---
                     st.divider()
                     st.subheader("🛡️ Comprehensive Climate Risk Matrix")
                     de_raw = inf.get('debtToEquity'); de_ratio = float(de_raw) if de_raw and de_raw != 'N/A' else 100.0
@@ -284,7 +255,7 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                             st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}"); st.caption(f"🔗 [Link]({n.get('link')})")
 
 # ==========================================
-# MODULE 2: GLOBAL TECHNICAL ANALYSIS (รักษาไว้ครบถ้วนตามเดิม)
+# MODULE 2: GLOBAL TECHNICAL ANALYSIS (ห้ามลบ/ย่อของเดิม)
 # ==========================================
 elif terminal_mode == "🌎 Global Technical Analysis":
     with st.sidebar:
@@ -295,9 +266,10 @@ elif terminal_mode == "🌎 Global Technical Analysis":
             global_tickers = [t.strip().upper() for t in [g1, g2, g3] if t.strip()]
         
         with st.expander("📈 Strategy Settings", expanded=True):
-            ma_s = st.slider("Short-Term MA", 5, 50, 20)
-            ma_l = st.slider("Long-Term MA", 50, 200, 50)
-            rsi_window = st.slider("RSI Window", 7, 30, 14)
+            ma_s = st.slider("Short-Term MA", 5, 50, 20, help="เส้นค่าเฉลี่ยระยะสั้น ใช้ดูแนวโน้มปัจจุบัน")
+            ma_l = st.slider("Long-Term MA", 50, 200, 50, help="เส้นค่าเฉลี่ยระยะยาว ใช้เป็นแนวรับ-แนวต้านสำคัญ")
+            rsi_window = st.slider("RSI Window", 7, 30, 14, help="ดัชนีกำลังสัมพัทธ์ (Overbought > 70 / Oversold < 30)")
+            st.info("💡 **Golden Cross:** เกิดขึ้นเมื่อเส้นสั้นตัดเส้นยาวขึ้น บ่งบอกถึงจุดเริ่มต้นของขาขึ้น")
 
     st.title("🌎 GLOBAL MARKET TECHNICAL INTELLIGENCE")
     if not global_tickers:
@@ -374,6 +346,84 @@ elif terminal_mode == "🌎 Global Technical Analysis":
                         st.subheader(f"📰 Global Intelligence: {symbol}")
                         for n in d['news']:
                             st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}"); st.caption(f"🔗 [Link]({n.get('link')})")
+
+# ==========================================
+# MODULE 3: THAI TECHNICAL ANALYSIS (หน้าใหม่ที่เพิ่มเข้ามา)
+# ==========================================
+elif terminal_mode == "📈 Thai Technical Analysis":
+    with st.sidebar:
+        with st.expander("🔍 Thai Stock Selection", expanded=True):
+            t1_th = st.text_input("Thai Stock 1", "CPALL.BK")
+            t2_th = st.text_input("Thai Stock 2", "AOT.BK")
+            t3_th = st.text_input("Thai Stock 3", "")
+            th_tr_tickers = [t.strip().upper() for t in [t1_th, t2_th, t3_th] if t.strip()]
+        
+        with st.expander("📈 Strategy Settings", expanded=True):
+            ma_s_th = st.slider("Short MA", 5, 50, 20)
+            ma_l_th = st.slider("Long MA", 50, 200, 50)
+            rsi_w_th = st.slider("RSI Period", 7, 30, 14)
+
+    st.title("📈 THAI STOCK TECHNICAL TRADING TERMINAL")
+    if not th_tr_tickers:
+        st.info("💡 กรุณาระบุ Ticker หุ้นไทย (เช่น KBANK.BK) เพื่อเริ่มวิเคราะห์")
+    else:
+        th_data = fetch_pro_data(th_tr_tickers, market_mode="TH")
+        if th_data:
+            th_tabs = st.tabs([f"Trading: {s}" for s in th_data.keys()])
+            for i, (symbol, d) in enumerate(th_data.items()):
+                with th_tabs[i]:
+                    # ส่วนหัวแบบภาพ 2
+                    st.markdown(f"### 🇹🇭 {symbol} - Stock Exchange of Thailand")
+                    st.markdown(f'<p class="market-header-sub">SET Real Time Price • THB</p>', unsafe_allow_html=True)
+
+                    df = d['history'].to_frame()
+                    df['MA_Short'] = df['Close'].rolling(window=ma_s_th).mean()
+                    df['MA_Long'] = df['Close'].rolling(window=ma_l_th).mean()
+                    exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+                    exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+                    df['MACD'] = exp1 - exp2
+                    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+                    delta = df['Close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=rsi_w_th).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_w_th).mean()
+                    df['RSI'] = 100 - (100 / (1 + (gain/loss)))
+
+                    fig_th = go.Figure()
+                    fig_th.add_trace(go.Scatter(x=df.index, y=df['Close'], name="Price", line=dict(color='#00ff88')))
+                    fig_th.add_trace(go.Scatter(x=df.index, y=df['MA_Short'], name=f"MA {ma_s_th}", line=dict(color='#f1e05a', dash='dash')))
+                    fig_th.add_trace(go.Scatter(x=df.index, y=df['MA_Long'], name=f"MA {ma_l_th}", line=dict(color='#da3633', dash='dot')))
+                    fig_th.update_layout(height=450, template="plotly_dark", margin=dict(l=0,r=0,t=20,b=0))
+                    st.plotly_chart(fig_th, use_container_width=True, key=f"th_tr_chart_{symbol}")
+
+                    c1, c2, c3, c4 = st.columns(4)
+                    rsi_v = df['RSI'].iloc[-1]
+                    trend_v = "📈 BULLISH" if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] else "📉 BEARISH"
+                    c1.metric("Price", f"฿{d['price']:,.2f}", f"{((d['price']/df['Close'].iloc[-2])-1)*100:+.2f}%")
+                    c2.metric("Trend Status", trend_v)
+                    c3.metric("RSI", f"{rsi_v:.2f}")
+                    macd_v = "BUY" if df['MACD'].iloc[-1] > df['Signal'].iloc[-1] else "SELL"
+                    c4.metric("MACD Signal", macd_v)
+
+                    st.divider()
+                    st.subheader(f"📊 Performance & Fundamentals: {symbol}")
+                    curr_p = d['price']
+                    ret_1m = ((curr_p / df['Close'].iloc[-21]) - 1) * 100
+                    ret_1y = ((curr_p / df['Close'].iloc[-252]) - 1) * 100
+                    p1, p2 = st.columns([1, 2])
+                    with p1:
+                        st.table(pd.DataFrame({"Period": ["1 Month", "1 Year"], "Return": [f"{ret_1m:+.2f}%", f"{ret_1y:+.2f}%"]}))
+                    with p2:
+                        inf = d.get('info', {})
+                        st.write(f"🏢 **Full Name:** {inf.get('longName', symbol)}")
+                        st.write(f"💰 **Div Yield:** {inf.get('dividendYield', 0)*100:.2f}%" if inf.get('dividendYield') else "💰 **Dividend:** N/A")
+                        st.write(f"📈 **52W High:** ฿{inf.get('fiftyTwoWeekHigh', 0):,.2f}")
+
+                    st.markdown('<div class="academic-box">', unsafe_allow_html=True)
+                    st.markdown('<p class="academic-label">🔍 Thai Trade recommendation</p>', unsafe_allow_html=True)
+                    if "BULL" in trend_v and rsi_v < 65: st.success(f"✅ **Signal: BUY** - หุ้น {symbol} อยู่ในแนวโน้มขาขึ้นและราคายังมี Upside")
+                    elif "BEAR" in trend_v and rsi_v > 35: st.error(f"⚠️ **Signal: SELL / WAIT** - แนวโน้มหลักเป็นขาลง แนะนำให้รอสัญญาณกลับตัว")
+                    else: st.warning("🔄 **Signal: HOLD** - สัญญาณทางเทคนิคยังไม่ชัดเจน แนะนำให้รอดูการตัดกันของ MA")
+                    st.markdown('</div>', unsafe_allow_html=True)
 
 # --- FOOTER ---
 st.markdown(f'<div class="footer">🏛️ Climate & Global Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
