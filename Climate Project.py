@@ -10,7 +10,7 @@ import time
 # --- CONFIGURATION ---
 st.set_page_config(page_title="Climate & Global Finance Pro Terminal", layout="wide")
 
-# --- CSS: ULTIMATE DARK TERMINAL UI (คงเดิม 100%) ---
+# --- CSS: ULTIMATE DARK TERMINAL UI (รักษาไว้ครบถ้วน 100% จากต้นฉบับของคุณ) ---
 st.markdown("""
     <style>
     .main { background: radial-gradient(circle at top right, #1a1f2e, #0d1117); color: white; }
@@ -54,6 +54,20 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- TOP PICKS ENGINE ---
+@st.cache_data(ttl=3600)
+def get_real_top_picks_5():
+    candidate_tickers = ["AOT.BK", "PTT.BK", "KBANK.BK", "GULF.BK", "CPALL.BK"]
+    picks = []
+    try:
+        data = yf.download(candidate_tickers, period="5d", progress=False)['Volume']
+        for t in candidate_tickers:
+            if t in data.columns:
+                v = data[t].dropna()
+                if not v.empty: picks.append({"symbol": t, "volume": v.iloc[-1]})
+    except: pass
+    return sorted(picks, key=lambda x: x['volume'], reverse=True)[:5]
+
 # --- GLOBAL DATA ENGINE ---
 @st.cache_data(ttl=600)
 def fetch_pro_data(ticker_list, market_mode="TH"):
@@ -83,20 +97,7 @@ def fetch_pro_data(ticker_list, market_mode="TH"):
         except: continue
     return full_res
 
-@st.cache_data(ttl=3600)
-def get_real_top_picks_5():
-    candidate_tickers = ["AOT.BK", "PTT.BK", "KBANK.BK", "GULF.BK", "CPALL.BK"]
-    picks = []
-    try:
-        data = yf.download(candidate_tickers, period="5d", progress=False)['Volume']
-        for t in candidate_tickers:
-            if t in data.columns:
-                v = data[t].dropna()
-                if not v.empty: picks.append({"symbol": t, "volume": v.iloc[-1]})
-    except: pass
-    return sorted(picks, key=lambda x: x['volume'], reverse=True)[:5]
-
-# --- SIDEBAR: NAVIGATION & SELECTION (จัดที่นี่เพื่อให้แสดงผลทุกหน้า) ---
+# --- SIDEBAR: NAVIGATION & SELECTION (จัดที่นี่เพื่อให้ทำงานได้ทุกลำดับการรัน) ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
     terminal_mode = st.radio("Select Module", [
@@ -106,9 +107,9 @@ with st.sidebar:
     ])
     st.divider()
 
-    # ย้ายการเลือกหุ้นมาไว้ข้างนอกหน้าเงื่อนไขเพื่อให้ข้อมูลส่งไปถึงกราฟแน่นอน
+    # ย้ายการเลือกหุ้นมาไว้ข้างนอกเพื่อให้ current_tickers มีค่าเสมอในทุกลำดับการคลิก
     if terminal_mode == "🏛️ Thai Climate Risk Project":
-        # หุ้นเด่นวันนี้เฉพาะหน้านี้
+        # หุ้นเด่นเฉพาะหน้านี้
         top_stocks = get_real_top_picks_5()
         stocks_html = "".join([f'<div class="top-pick-item"><span>{s["symbol"]}</span><span style="color:#8b949e; font-size:0.7rem;">Active Vol.</span></div>' for s in top_stocks])
         st.markdown(f'<div class="top-pick-container"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p>{stocks_html}</div>', unsafe_allow_html=True)
@@ -147,7 +148,7 @@ with st.sidebar:
         market_type = "Global"
 
 # ==========================================
-# MAIN EXECUTION: รันข้อมูลตาม tickers ที่เลือก
+# MAIN EXECUTION: แสดงผลตาม Module
 # ==========================================
 if current_tickers:
     analysis_data = fetch_pro_data(current_tickers, market_mode=market_type)
