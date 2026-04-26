@@ -132,7 +132,7 @@ def fetch_pro_data(ticker_list, market_mode="TH"):
     return full_res
 
 # ==========================================
-# MODULE 1: THAI CLIMATE RISK (เพิ่ม Deep Dive & Header ห้ามลบของเดิม)
+# MODULE 1: THAI CLIMATE RISK (แก้ไข Error Duplicate ID)
 # ==========================================
 if terminal_mode == "🇹🇭 Thai Climate Risk":
     @st.cache_data(ttl=3600)
@@ -180,11 +180,9 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
             tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
             for i, (symbol, d) in enumerate(analysis.items()):
                 with tabs[i]:
-                    # --- ส่วนหัวเหมือนภาพ 2 ---
                     st.markdown(f"### 🇹🇭 {symbol} - Stock Exchange of Thailand")
                     st.markdown(f'<p class="market-header-sub">SET - Thailand Real Time Price • THB</p>', unsafe_allow_html=True)
 
-                    # Overview Metrics Row
                     m1, m2, m3, m4 = st.columns(4)
                     curr_p = d['price']
                     prev_p = d['history'].iloc[-2]
@@ -197,7 +195,6 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                     st.subheader(f"📈 Price Performance: {symbol}")
                     st.line_chart(d['history'].iloc[-252:], color="#00ff88")
 
-                    # --- ส่วน Deep Dive เหมือนหน้า Global (ห้ามลบ) ---
                     st.divider()
                     st.subheader(f"📊 Deep Dive: {symbol} Financials & Performance")
                     ret_1m = ((curr_p / d['history'].iloc[-21]) - 1) * 100
@@ -221,7 +218,6 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                             st.write(f"🏦 **Industry:** {inf.get('industry', 'N/A')}")
                             st.write(f"📉 **52W Low:** ฿{inf.get('fiftyTwoWeekLow', 0):,.2f}")
 
-                    # --- ส่วนเดิม Market Intelligence Grid ---
                     st.divider()
                     st.subheader(f"📊 Market Intelligence: {symbol}")
                     def get_val(key, style="{:,.2f}"):
@@ -237,7 +233,6 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                     with m_c5: st.markdown(f'<div class="market-card"><div class="market-label">Div. Yield</div><div class="market-value">{get_val("dividendYield", "{:.2%}")}</div></div>', unsafe_allow_html=True)
                     with m_c6: st.markdown(f'<div class="market-card"><div class="market-label">Debt/Equity</div><div class="market-value">{get_val("debtToEquity")}</div></div>', unsafe_allow_html=True)
 
-                    # --- ส่วนเดิม Climate Risk Analytics ---
                     st.divider()
                     st.subheader("🛡️ Comprehensive Climate Risk Matrix")
                     de_raw = inf.get('debtToEquity'); de_ratio = float(de_raw) if de_raw and de_raw != 'N/A' else 100.0
@@ -257,15 +252,17 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
 
                     c1, c2 = st.columns(2)
                     with c1:
-                        fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = dynamic_trans, gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "white"}, 'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
+                        fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = dynamic_trans, title={'text': "Transition Sensitivity"}, gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "white"}, 'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
                         fig_gauge.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=50, b=0))
-                        st.plotly_chart(fig_gauge, use_container_width=True)
+                        # เพิ่ม Key เพื่อแก้ Duplicate ID
+                        st.plotly_chart(fig_gauge, use_container_width=True, key=f"th_gauge_{symbol}")
                     with c2:
                         raw_cap = inf.get('marketCap', 1e9); mkt_cap_mb = float(raw_cap)/1e6
                         val_impact = (tax_price * 1000) / wacc / 1e6; adj_val = mkt_cap_mb - val_impact
                         fig_water = go.Figure(go.Waterfall(orientation = "v", x = ["Initial", "Climate Loss", "Adjusted"], y = [mkt_cap_mb, -val_impact, adj_val], textposition = "outside", increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
                         fig_water.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=20, b=0))
-                        st.plotly_chart(fig_water, use_container_width=True)
+                        # เพิ่ม Key เพื่อแก้ Duplicate ID
+                        st.plotly_chart(fig_water, use_container_width=True, key=f"th_water_{symbol}")
 
                     if d['news']:
                         st.subheader(f"📰 Intelligence Feed: {symbol}")
@@ -273,7 +270,7 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                             st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}"); st.caption(f"🔗 [Link]({n.get('link')})")
 
 # ==========================================
-# MODULE 2: GLOBAL TECHNICAL ANALYSIS (จัดเต็มแบบเดิม ห้ามย่อ ห้ามลบ)
+# MODULE 2: GLOBAL TECHNICAL ANALYSIS
 # ==========================================
 elif terminal_mode == "🌎 Global Technical Analysis":
     with st.sidebar:
@@ -284,10 +281,9 @@ elif terminal_mode == "🌎 Global Technical Analysis":
             global_tickers = [t.strip().upper() for t in [g1, g2, g3] if t.strip()]
         
         with st.expander("📈 Strategy Settings", expanded=True):
-            ma_s = st.slider("Short-Term MA", 5, 50, 20, help="เส้นค่าเฉลี่ยระยะสั้น ใช้ดูแนวโน้มปัจจุบัน")
-            ma_l = st.slider("Long-Term MA", 50, 200, 50, help="เส้นค่าเฉลี่ยระยะยาว ใช้เป็นแนวรับ-แนวต้านสำคัญ")
-            rsi_window = st.slider("RSI Window", 7, 30, 14, help="ดัชนีกำลังสัมพัทธ์ (Overbought > 70 / Oversold < 30)")
-            st.info("💡 **Golden Cross:** เกิดขึ้นเมื่อเส้นสั้นตัดเส้นยาวขึ้น บ่งบอกถึงจุดเริ่มต้นของขาขึ้น")
+            ma_s = st.slider("Short-Term MA", 5, 50, 20)
+            ma_l = st.slider("Long-Term MA", 50, 200, 50)
+            rsi_window = st.slider("RSI Window", 7, 30, 14)
 
     st.title("🌎 GLOBAL MARKET TECHNICAL INTELLIGENCE")
     if not global_tickers:
@@ -298,11 +294,9 @@ elif terminal_mode == "🌎 Global Technical Analysis":
             g_tabs = st.tabs([f"Analysis: {s}" for s in g_data.keys()])
             for i, (symbol, d) in enumerate(g_data.items()):
                 with g_tabs[i]:
-                    # หัวตลาด (ห้ามลบ)
                     st.markdown(f"### 🌎 {symbol} - {d.get('info', {}).get('exchange', 'Global Exchange')}")
                     st.markdown(f'<p class="market-header-sub">{d.get("info", {}).get("exchange", "NASDAQ")} Real Time Price • USD</p>', unsafe_allow_html=True)
 
-                    # Indicators Calculation
                     df = d['history'].to_frame()
                     df['MA_Short'] = df['Close'].rolling(window=ma_s).mean()
                     df['MA_Long'] = df['Close'].rolling(window=ma_l).mean()
@@ -315,15 +309,13 @@ elif terminal_mode == "🌎 Global Technical Analysis":
                     loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_window).mean()
                     df['RSI'] = 100 - (100 / (1 + (gain/loss)))
 
-                    # Chart
                     fig_global = go.Figure()
                     fig_global.add_trace(go.Scatter(x=df.index, y=df['Close'], name="Price", line=dict(color='#00ff88', width=2)))
                     fig_global.add_trace(go.Scatter(x=df.index, y=df['MA_Short'], name=f"MA {ma_s}", line=dict(color='#f1e05a', dash='dash')))
                     fig_global.add_trace(go.Scatter(x=df.index, y=df['MA_Long'], name=f"MA {ma_l}", line=dict(color='#da3633', dash='dot')))
                     fig_global.update_layout(height=450, template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
-                    st.plotly_chart(fig_global, use_container_width=True)
+                    st.plotly_chart(fig_global, use_container_width=True, key=f"g_chart_{symbol}")
 
-                    # Technical Status Row
                     c1, c2, c3, c4 = st.columns(4)
                     rsi_val = df['RSI'].iloc[-1]
                     trend_label = "📈 BULLISH" if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] else "📉 BEARISH"
@@ -333,7 +325,6 @@ elif terminal_mode == "🌎 Global Technical Analysis":
                     macd_val = "BUY" if df['MACD'].iloc[-1] > df['Signal'].iloc[-1] else "SELL"
                     c4.metric("MACD Signal", macd_val)
 
-                    # Deep Dive Section (จัดเต็ม ห้ามลบ)
                     st.divider()
                     st.subheader(f"📊 Deep Dive: {symbol} Financials & Performance")
                     curr_p = d['price']
