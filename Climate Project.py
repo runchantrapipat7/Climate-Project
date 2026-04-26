@@ -88,18 +88,17 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- NAVIGATION SYSTEM (เพิ่มใหม่เพื่อแยกหน้า) ---
+# --- NAVIGATION SYSTEM (รักษาไว้ 100%) ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
     terminal_mode = st.radio("Terminal Module", ["🇹🇭 Thai Climate Risk", "🌎 Global Technical Analysis"])
     st.divider()
 
-# --- DATA ENGINE (รักษา Logic เดิม แต่ทำให้ยืดหยุ่นขึ้น) ---
+# --- DATA ENGINE (รักษาไว้ 100%) ---
 @st.cache_data(ttl=600)
 def fetch_pro_data(ticker_list, market_mode="TH"):
     full_res = {}
     proxies = pd.DataFrame()
-    # กำหนด Index อ้างอิงตามตลาดที่เลือก
     ref_idx = "^SET.BK" if market_mode == "TH" else "^GSPC"
     try:
         proxies = yf.download(["PTTEP.BK", "EA.BK", ref_idx], period="1y", progress=False)['Close'].ffill()
@@ -144,10 +143,9 @@ def fetch_pro_data(ticker_list, market_mode="TH"):
     return full_res
 
 # ==========================================
-# MODULE 1: THAI CLIMATE RISK (โค้ดเดิมของคุณ 100%)
+# MODULE 1: THAI CLIMATE RISK (รักษาไว้ 100%)
 # ==========================================
 if terminal_mode == "🇹🇭 Thai Climate Risk":
-    # --- TOP PICKS ENGINE (รักษาของเดิม) ---
     @st.cache_data(ttl=3600)
     def get_real_top_picks_5():
         candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
@@ -265,7 +263,7 @@ if terminal_mode == "🇹🇭 Thai Climate Risk":
                     else: st.write("No recent news found.")
 
 # ==========================================
-# MODULE 2: GLOBAL TECHNICAL ANALYSIS (ส่วนที่เพิ่มใหม่)
+# MODULE 2: GLOBAL TECHNICAL ANALYSIS (แก้ไขเพิ่มคำอธิบายใน Strategy Settings)
 # ==========================================
 elif terminal_mode == "🌎 Global Technical Analysis":
     with st.sidebar:
@@ -276,9 +274,20 @@ elif terminal_mode == "🌎 Global Technical Analysis":
             global_tickers = [t.strip().upper() for t in [g1, g2, g3] if t.strip()]
         
         with st.expander("📈 Strategy Settings", expanded=True):
-            ma_s = st.slider("Short-Term MA", 5, 50, 20)
-            ma_l = st.slider("Long-Term MA", 50, 200, 50)
-            rsi_window = st.slider("RSI Window", 7, 30, 14)
+            # --- ส่วนที่เพิ่มคำอธิบาย (Help Text) ---
+            ma_s = st.slider(
+                "Short-Term MA", 5, 50, 20, 
+                help="เส้นค่าเฉลี่ยเคลื่อนที่ระยะสั้น (เช่น 20 วัน) ใช้เพื่อดูแนวโน้มราคาปัจจุบันและหาจุดตัดเพื่อส่งสัญญาณซื้อขาย"
+            )
+            ma_l = st.slider(
+                "Long-Term MA", 50, 200, 50, 
+                help="เส้นค่าเฉลี่ยเคลื่อนที่ระยะยาว (เช่น 50 หรือ 200 วัน) ใช้เป็นแนวรับ-แนวต้านสำคัญเพื่อยืนยันแนวโน้มขาขึ้นหรือขาลงขนาดใหญ่"
+            )
+            rsi_window = st.slider(
+                "RSI Window", 7, 30, 14, 
+                help="Relative Strength Index (RSI) ใช้ดัชนีกำลังสัมพัทธ์เพื่อดูสภาวะการซื้อมากเกินไป (Overbought > 70) หรือขายมากเกินไป (Oversold < 30)"
+            )
+            st.info("💡 **Tip:** เมื่อ Short MA ตัดขึ้นเหนือ Long MA จะเกิดสัญญาณ 'Golden Cross' ซึ่งบ่งบอกถึงแนวโน้มขาขึ้น")
 
     st.title("🌎 GLOBAL MARKET TECHNICAL INTELLIGENCE")
     if not global_tickers:
@@ -289,19 +298,15 @@ elif terminal_mode == "🌎 Global Technical Analysis":
             g_tabs = st.tabs([f"Market Trend: {s}" for s in g_data.keys()])
             for i, (symbol, d) in enumerate(g_data.items()):
                 with g_tabs[i]:
-                    # วิเคราะห์ราคาขึ้น-ลงด้วย Technical Indicators
                     df = d['history'].to_frame()
                     df['MA_Short'] = df['Close'].rolling(window=ma_s).mean()
                     df['MA_Long'] = df['Close'].rolling(window=ma_l).mean()
-                    
-                    # RSI Calculation
                     delta = df['Close'].diff()
                     gain = (delta.where(delta > 0, 0)).rolling(window=rsi_window).mean()
                     loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_window).mean()
                     rs = gain / loss
                     df['RSI'] = 100 - (100 / (1 + rs))
 
-                    # กราฟราคาแบบ Technical
                     fig_global = go.Figure()
                     fig_global.add_trace(go.Scatter(x=df.index, y=df['Close'], name="Price", line=dict(color='#00ff88', width=2)))
                     fig_global.add_trace(go.Scatter(x=df.index, y=df['MA_Short'], name=f"MA {ma_s}", line=dict(color='#f1e05a', dash='dash')))
@@ -309,7 +314,6 @@ elif terminal_mode == "🌎 Global Technical Analysis":
                     fig_global.update_layout(height=450, template="plotly_dark", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', margin=dict(l=0,r=0,t=20,b=0))
                     st.plotly_chart(fig_global, use_container_width=True)
 
-                    # สรุปสัญญาณการวิเคราะห์
                     c1, c2, c3 = st.columns(3)
                     curr_price = df['Close'].iloc[-1]
                     prev_price = df['Close'].iloc[-2]
@@ -336,7 +340,6 @@ elif terminal_mode == "🌎 Global Technical Analysis":
                         st.markdown(f'<p class="market-value">{price_change:+.2f}%</p>', unsafe_allow_html=True)
                         st.markdown('</div>', unsafe_allow_html=True)
 
-                    # สรุปคำแนะนำแบบทางการ
                     st.markdown('<div class="academic-box">', unsafe_allow_html=True)
                     st.markdown('<p class="academic-label">🔍 Executive Summary & Trade Signal</p>', unsafe_allow_html=True)
                     if df['MA_Short'].iloc[-1] > df['MA_Long'].iloc[-1] and rsi_val < 70:
