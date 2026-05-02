@@ -104,12 +104,125 @@ def fetch_pro_data(ticker_list, market_mode="TH"):
         except: continue
     return full_res
 
+
+# --- CLIMATE REPRICING ENGINE (proposal-style; illustrative steady-state) ---
+# Transition: margin shock from shadow carbon price × emissions intensity × pass-through (DCF channel).
+# Physical: equity haircut from flood exposure × damage sensitivity (damage-function proxy).
+NGFS_SCP_USD = {
+    "Net Zero 2050": 95.0,
+    "Delayed Transition": 155.0,
+    "Current Policy": 32.0,
+}
+SECTOR_INTENSITY_T_PER_M = {
+    "Energy / Oil & Gas": 850.0,
+    "Materials": 620.0,
+    "Utilities": 1050.0,
+    "Industrials": 340.0,
+    "Financials": 45.0,
+    "Technology": 28.0,
+    "Consumer": 160.0,
+    "Real Estate": 95.0,
+    "Healthcare": 55.0,
+    "Communication": 38.0,
+    "Default / Other": 210.0,
+}
+
+
+def margin_shock_from_transition(
+    intensity_t_per_mrev: float,
+    scp_local_per_tonne: float,
+    pass_through: float,
+) -> float:
+    """Share of revenue absorbed by carbon-related cash costs (annual steady state)."""
+    return (intensity_t_per_mrev * scp_local_per_tonne * pass_through) / 1e6
+
+
+def transition_equity_haircut(margin_shock: float, operating_leverage: float) -> float:
+    """Map EBITDA margin shock to equity value impact (first-order)."""
+    return float(min(max(operating_leverage * margin_shock, 0.0), 0.85))
+
+
+def physical_equity_haircut(flood_exposure_pct: float, damage_sensitivity: float) -> float:
+    """Convex proxy for hazard → financial loss (inspired by damage functions; capped)."""
+    u = max(0.0, min(100.0, flood_exposure_pct)) / 100.0
+    raw = damage_sensitivity * (u ** 1.15)
+    return float(min(max(raw, 0.0), 0.45))
+
+
+def climate_adjusted_price(
+    spot: float,
+    intensity_t_per_mrev: float,
+    scp_usd_per_tonne: float,
+    pass_through: float,
+    operating_leverage: float,
+    flood_exposure_pct: float,
+    physical_sensitivity: float,
+    fx_local_per_usd: float,
+):
+    """
+    fx_local_per_usd: how many units of local currency (e.g. THB) per 1 USD — used to convert SCP.
+    """
+    if fx_local_per_usd <= 0:
+        fx_local_per_usd = 1.0
+    scp_local = scp_usd_per_tonne * fx_local_per_usd
+    m_shock = margin_shock_from_transition(intensity_t_per_mrev, scp_local, pass_through)
+    t_hit = transition_equity_haircut(m_shock, operating_leverage)
+    p_hit = physical_equity_haircut(flood_exposure_pct, physical_sensitivity)
+    combined = (1.0 - t_hit) * (1.0 - p_hit)
+    combined = max(combined, 0.05)
+    return {
+        "scp_local_per_tonne": scp_local,
+        "margin_shock": m_shock,
+        "transition_hit": t_hit,
+        "physical_hit": p_hit,
+        "combined_factor": combined,
+        "adjusted_price": spot * combined,
+    }
+
+
+@st.cache_data(ttl=600)
+def fetch_ticker_snapshot(symbol: str):
+    sym = symbol.strip().upper()
+    if not sym:
+        return None
+    try:
+        t = yf.Ticker(sym)
+        hist = t.history(period="1mo")
+        if hist.empty:
+            return None
+        price = float(hist["Close"].iloc[-1])
+        info = {}
+        try:
+            info = t.info if getattr(t, "info", None) else {}
+        except Exception:
+            info = {}
+        rev = info.get("totalRevenue")
+        if rev is None:
+            rev = info.get("totalCashPerShare")
+        return {"symbol": sym, "price": price, "info": info, "revenue": rev}
+    except Exception:
+        return None
+
+
+def historical_cvar_pct(daily_returns: pd.Series, alpha: float = 0.05) -> float:
+    """Historical CVaR (expected shortfall) on simple return series; reported as positive % loss."""
+    x = daily_returns.dropna()
+    if len(x) < 30:
+        return float("nan")
+    var_q = x.quantile(alpha)
+    tail = x[x <= var_q]
+    if tail.empty:
+        return float("nan")
+    return float(-tail.mean() * 100.0)
+
+
 # --- SIDEBAR NAVIGATION (เพิ่มรายการใน Module) ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
     terminal_mode = st.radio(
         "Select Module",
         [
+            "🧮 Climate Price Impact Calculator",
             "🏛️ Thai Climate Risk",
             "🌎 Global Technical Analysis",
             "📈 Thai Technical Analysis",
@@ -119,9 +232,201 @@ with st.sidebar:
     st.divider()
 
 # ==========================================
+# MODULE: CLIMATE PRICE IMPACT — proposal-style repricing
+# ==========================================
+if terminal_mode == "🧮 Climate Price Impact Calculator":
+    st.title("🧮 Climate-adjusted equity price (proposal channels)")
+    st.caption(
+        "Maps **transition** (shadow carbon price × intensity × pass-through → margin shock → equity) and "
+        "**physical** (flood exposure → damage proxy) into an illustrative **repricing factor**. "
+        "Calibrate intensity & FX against your thesis data — defaults are educational only."
+    )
+
+    with st.sidebar:
+        st.subheader("Calculator inputs")
+        calc_ticker = st.text_input("Ticker", "PTT.BK", key="calc_sym")
+        scenario_calc = st.selectbox(
+            "NGFS-style pathway (SCP snapshot)",
+            list(NGFS_SCP_USD.keys()),
+            index=1,
+            help="Illustrative USD/t CO₂ shadow prices for medium-term stress (not official NGFS pull).",
+        )
+        fx_thb_usd = st.number_input(
+            "THB per 1 USD (FX)",
+            min_value=1.0,
+            max_value=80.0,
+            value=36.5,
+            step=0.1,
+            help="Converts SCP (USD/t) to THB/t for SET names. For US stocks, set to 1 and read SCP as USD labels only.",
+        )
+        market_flag = st.radio(
+            "Quote currency",
+            ["SET (THB — typical .BK)", "US / USD listing"],
+            horizontal=True,
+        )
+        fx_use = float(fx_thb_usd) if market_flag.startswith("SET") else 1.0
+
+        sector_pick = st.selectbox("Sector intensity preset (tCO₂e / M revenue)", list(SECTOR_INTENSITY_T_PER_M.keys()))
+        intensity_override = st.checkbox("Manual intensity override")
+        if intensity_override:
+            intensity_t = st.slider(
+                "Intensity (tonnes CO₂e per M **local** revenue)",
+                10.0,
+                2000.0,
+                float(SECTOR_INTENSITY_T_PER_M[sector_pick]),
+            )
+        else:
+            intensity_t = SECTOR_INTENSITY_T_PER_M[sector_pick]
+
+        pass_through = st.slider("Carbon cost pass-through τ (imperfect pass-through)", 0.0, 1.0, 0.55, 0.05)
+        op_lev = st.slider("Operating leverage Ω (margin shock → equity)", 0.8, 3.0, 1.35, 0.05)
+
+        st.divider()
+        flood_u = st.slider("Physical exposure index (flood / hazard, 0–100)", 0, 100, 35)
+        phys_sens = st.slider("Physical damage sensitivity (equity channel)", 0.0, 1.2, 0.35, 0.05)
+
+    snap = fetch_ticker_snapshot(calc_ticker) if calc_ticker.strip() else None
+
+    colA, colB = st.columns([1, 1])
+    with colA:
+        manual_rev = st.number_input(
+            "Annual revenue override (local currency, 0 = use Yahoo if available)",
+            min_value=0.0,
+            value=0.0,
+            step=1e9,
+            format="%.0f",
+        )
+
+    if snap:
+        inf = snap["info"]
+        name = inf.get("longName") or inf.get("shortName") or snap["symbol"]
+        rev_raw = snap.get("revenue")
+        st.subheader(f"{snap['symbol']} — {name}")
+        m1, m2, m3 = st.columns(3)
+        spot = snap["price"]
+        m1.metric("Spot (last close)", f"{spot:,.2f}" + (" ฿" if market_flag.startswith("SET") else " $"))
+        cap = inf.get("marketCap")
+        if cap:
+            m2.metric("Market cap", f"{cap/1e9:,.2f}B" + (" THB" if market_flag.startswith("SET") else " USD"))
+        else:
+            m2.metric("Market cap", "N/A")
+        rev_disp = manual_rev if manual_rev > 0 else (rev_raw if rev_raw else None)
+        if rev_disp:
+            m3.metric("Revenue (annual, proxy)", f"{rev_disp/1e9:,.2f}B")
+        else:
+            m3.metric("Revenue", "Enter override →")
+
+        scp_usd = NGFS_SCP_USD[scenario_calc]
+        res_single = climate_adjusted_price(
+            spot=spot,
+            intensity_t_per_mrev=intensity_t,
+            scp_usd_per_tonne=scp_usd,
+            pass_through=pass_through,
+            operating_leverage=op_lev,
+            flood_exposure_pct=float(flood_u),
+            physical_sensitivity=phys_sens,
+            fx_local_per_usd=fx_use,
+        )
+
+        st.divider()
+        st.subheader("Single-scenario repricing")
+        r1, r2, r3, r4 = st.columns(4)
+        r1.metric("Shadow SCP (USD/t)", f"{scp_usd:,.0f}")
+        r2.metric("SCP in local / t", f"{res_single['scp_local_per_tonne']:,.0f}")
+        r3.metric("Margin shock (rev)", f"{res_single['margin_shock']*100:.2f}%")
+        r4.metric("Climate-adjusted price", f"{res_single['adjusted_price']:,.2f}")
+
+        ex1, ex2, ex3 = st.columns(3)
+        ex1.metric("Transition equity haircut", f"{res_single['transition_hit']*100:.2f}%")
+        ex2.metric("Physical equity haircut", f"{res_single['physical_hit']*100:.2f}%")
+        ex3.metric("Combined factor", f"{res_single['combined_factor']:.4f}")
+
+        t_h, p_h = res_single["transition_hit"], res_single["physical_hit"]
+        p1 = spot * (1.0 - t_h)
+        fig_w = go.Figure(
+            go.Waterfall(
+                orientation="v",
+                x=["Spot", "− Transition", "− Physical", "Adjusted"],
+                y=[
+                    spot,
+                    -spot * t_h,
+                    -p1 * p_h,
+                    max(res_single["adjusted_price"], 0.0),
+                ],
+                measure=["absolute", "relative", "relative", "total"],
+                textposition="outside",
+                increasing={"marker": {"color": "#2ea043"}},
+                decreasing={"marker": {"color": "#da3633"}},
+                totals={"marker": {"color": "#1f6feb"}},
+            )
+        )
+        fig_w.update_layout(
+            height=360,
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="white"),
+            showlegend=False,
+        )
+        st.plotly_chart(fig_w, use_container_width=True, key="calc_waterfall")
+
+        st.subheader("Scenario comparison (same company & sliders)")
+        rows = []
+        for scen_name, scp_u in NGFS_SCP_USD.items():
+            r = climate_adjusted_price(
+                spot=spot,
+                intensity_t_per_mrev=intensity_t,
+                scp_usd_per_tonne=scp_u,
+                pass_through=pass_through,
+                operating_leverage=op_lev,
+                flood_exposure_pct=float(flood_u),
+                physical_sensitivity=phys_sens,
+                fx_local_per_usd=fx_use,
+            )
+            rows.append(
+                {
+                    "Scenario": scen_name,
+                    "SCP USD/t": scp_u,
+                    "Margin shock %": r["margin_shock"] * 100,
+                    "Adj. price": r["adjusted_price"],
+                    "Δ vs spot %": (r["adjusted_price"] / spot - 1) * 100,
+                }
+            )
+        st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
+        hist = yf.Ticker(snap["symbol"]).history(period="2y")
+        if not hist.empty and len(hist) > 60:
+            rets = hist["Close"].pct_change()
+            cvar = historical_cvar_pct(rets, 0.05)
+            if not np.isnan(cvar):
+                st.caption(
+                    f"Historical 5% CVaR (1-day returns, past ~2y): **{cvar:.2f}%** — tail benchmark only; "
+                    "not the thesis Climate VaR unless you align horizon & shocks."
+                )
+
+        with st.expander("Formulas used (matches proposal narrative)", expanded=False):
+            st.latex(r"\delta_{\mathrm{margin}} \approx \frac{\mathrm{Intensity}_{t/\mathrm{Mrev}} \cdot \mathrm{SCP}_{\mathrm{local}} \cdot \tau}{10^6}")
+            st.latex(r"\mathrm{Hit}_{\mathrm{trans}} = \min(\Omega \cdot \delta_{\mathrm{margin}},\,\mathrm{cap})")
+            st.latex(r"P_{\mathrm{adj}} \approx P_0 \cdot (1 - \mathrm{Hit}_{\mathrm{trans}}) \cdot (1 - \mathrm{Hit}_{\mathrm{phys}})")
+            st.markdown(
+                "**Physical:** Hit_phys = min(s · (flood/100)^1.15, cap). Tune **s** with the damage-sensitivity slider."
+            )
+
+        st.info(
+            "**H1 check:** Compare **Delayed Transition** vs **Net Zero** rows — higher SCP should imply "
+            "lower adjusted price for carbon-intensive intensity (all else equal)."
+        )
+    else:
+        st.warning("Enter a valid ticker (e.g. PTT.BK, AAPL) to load prices.")
+
+    st.divider()
+    st.caption(
+        "Illustrative teaching model — not BOT ICAAP, not NGFS official calibration. Replace SCP table & intensity with your thesis data."
+    )
+
+# ==========================================
 # MODULE 0: RESEARCH FRAMEWORK — aligns website with IS proposal PDF
 # ==========================================
-if terminal_mode == "📘 Research Framework (IS Proposal)":
+elif terminal_mode == "📘 Research Framework (IS Proposal)":
     st.title("Climate Risk Modeling and Sustainable Finance")
     st.caption(
         "Independent Study Proposal · MSc Financial Engineering · Graduate School of Development Economics (NIDA) · Academic Year 2025"
@@ -153,11 +458,12 @@ if terminal_mode == "📘 Research Framework (IS Proposal)":
             """
 | Proposal concept | In this app (now) |
 |------------------|-------------------|
-| NGFS transition pathway | Scenario slider: Net Zero / Delayed / Current Policy |
-| Shadow carbon price → stress | Stylized **tax price** + multiplier (illustrative) |
-| Physical hazard → **LGD** | User **flood exposure** slider (qualitative proxy) |
-| Market repricing / Climate VaR | **Carbon sensitivity** (OLS vs PTTEP−EA spread) + **illustrative** % gauge |
-| Technical monitoring | Global / Thai **MA·RSI·MACD** modules (not core thesis math) |
+| NGFS transition pathway | **Climate Price Impact Calculator** + Thai module scenario names |
+| Shadow carbon price → **equity repricing** | SCP (USD/t) table → **margin shock** → **equity haircut** (Ω) |
+| Physical hazard → loss | Flood index → **convex damage proxy** on equity |
+| Scenario comparison (H1) | Side‑by‑side **Net Zero / Delayed / Current** adjusted prices |
+| OLS “carbon beta” (Thai module) | **Market** sensitivity to PTTEP−EA spread (separate from calculator) |
+| Technical monitoring | Global / Thai **MA·RSI·MACD** (not core prudential math) |
 """
         )
 
@@ -178,7 +484,7 @@ if terminal_mode == "📘 Research Framework (IS Proposal)":
 - **H1:** **Delayed Transition** implies higher portfolio **EL** and **Climate VaR** than **Net Zero 2050** (disorderly vs orderly pathway).
 - **H2 (regional):** In the medium term, **physical** drivers may dominate **LGD** channels vs transition-driven **PD**—validated via contribution analysis (proposal §3.4).
 
-This UI does **not** estimate PD/LGD/EAD numerically; it helps **communicate** scenarios and sensitivity until full data pipelines are connected.
+The **Climate Price Impact Calculator** implements transparent **equity repricing** from transition + physical channels. Full **EL = PD×LGD×EAD** and loan-level DCF still require your **proxy portfolio** and calibrated inputs.
 """
     )
 
