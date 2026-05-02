@@ -222,8 +222,7 @@ with st.sidebar:
     terminal_mode = st.radio(
         "Select Module",
         [
-            "🧮 Climate Price Impact Calculator",
-            "🏛️ Thai Climate Risk",
+            "🏛️ Thai Climate Risk & Price Impact",
             "🌎 Global Technical Analysis",
             "📈 Thai Technical Analysis",
             "📘 Research Framework (IS Proposal)",
@@ -232,196 +231,355 @@ with st.sidebar:
     st.divider()
 
 # ==========================================
-# MODULE: CLIMATE PRICE IMPACT — proposal-style repricing
+# MODULE: THAI CLIMATE + PRICE IMPACT (combined — one entry for professor demo)
 # ==========================================
-if terminal_mode == "🧮 Climate Price Impact Calculator":
-    st.title("🧮 Climate-adjusted equity price (proposal channels)")
-    st.caption(
-        "Maps **transition** (shadow carbon price × intensity × pass-through → margin shock → equity) and "
-        "**physical** (flood exposure → damage proxy) into an illustrative **repricing factor**. "
-        "Calibrate intensity & FX against your thesis data — defaults are educational only."
-    )
+if terminal_mode == "🏛️ Thai Climate Risk & Price Impact":
+    @st.cache_data(ttl=3600)
+    def get_real_top_picks_5():
+        candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
+        picks = []
+        try:
+            data = yf.download(candidate_tickers, period="5d", progress=False)['Volume']
+            for t in candidate_tickers:
+                if t in data.columns:
+                    v = data[t].dropna()
+                    if not v.empty: picks.append({"symbol": t, "volume": v.iloc[-1]})
+        except: pass
+        return sorted(picks, key=lambda x: x['volume'], reverse=True)[:5]
 
     with st.sidebar:
-        st.subheader("Calculator inputs")
-        calc_ticker = st.text_input("Ticker", "PTT.BK", key="calc_sym")
-        scenario_calc = st.selectbox(
-            "NGFS-style pathway (SCP snapshot)",
-            list(NGFS_SCP_USD.keys()),
-            index=1,
-            help="Illustrative USD/t CO₂ shadow prices for medium-term stress (not official NGFS pull).",
+        thai_workspace = st.radio(
+            "Thai climate workspace",
+            ["🧮 Climate-adjusted price", "📊 SET intelligence & TCFD"],
+            index=0,
+            key="thai_workspace_pick",
         )
-        fx_thb_usd = st.number_input(
-            "THB per 1 USD (FX)",
-            min_value=1.0,
-            max_value=80.0,
-            value=36.5,
-            step=0.1,
-            help="Converts SCP (USD/t) to THB/t for SET names. For US stocks, set to 1 and read SCP as USD labels only.",
-        )
-        market_flag = st.radio(
-            "Quote currency",
-            ["SET (THB — typical .BK)", "US / USD listing"],
-            horizontal=True,
-        )
-        fx_use = float(fx_thb_usd) if market_flag.startswith("SET") else 1.0
 
-        sector_pick = st.selectbox("Sector intensity preset (tCO₂e / M revenue)", list(SECTOR_INTENSITY_T_PER_M.keys()))
-        intensity_override = st.checkbox("Manual intensity override")
-        if intensity_override:
-            intensity_t = st.slider(
-                "Intensity (tonnes CO₂e per M **local** revenue)",
-                10.0,
-                2000.0,
-                float(SECTOR_INTENSITY_T_PER_M[sector_pick]),
+    if thai_workspace == "🧮 Climate-adjusted price":
+        with st.sidebar:
+            st.subheader("Calculator inputs")
+            calc_ticker = st.text_input("Ticker", "PTT.BK", key="calc_sym")
+            scenario_calc = st.selectbox(
+                "NGFS-style pathway (SCP snapshot)",
+                list(NGFS_SCP_USD.keys()),
+                index=1,
+                help="Illustrative USD/t CO₂ shadow prices for medium-term stress (not official NGFS pull).",
             )
-        else:
-            intensity_t = SECTOR_INTENSITY_T_PER_M[sector_pick]
-
-        pass_through = st.slider("Carbon cost pass-through τ (imperfect pass-through)", 0.0, 1.0, 0.55, 0.05)
-        op_lev = st.slider("Operating leverage Ω (margin shock → equity)", 0.8, 3.0, 1.35, 0.05)
-
-        st.divider()
-        flood_u = st.slider("Physical exposure index (flood / hazard, 0–100)", 0, 100, 35)
-        phys_sens = st.slider("Physical damage sensitivity (equity channel)", 0.0, 1.2, 0.35, 0.05)
-
-    snap = fetch_ticker_snapshot(calc_ticker) if calc_ticker.strip() else None
-
-    colA, colB = st.columns([1, 1])
-    with colA:
-        manual_rev = st.number_input(
-            "Annual revenue override (local currency, 0 = use Yahoo if available)",
-            min_value=0.0,
-            value=0.0,
-            step=1e9,
-            format="%.0f",
-        )
-
-    if snap:
-        inf = snap["info"]
-        name = inf.get("longName") or inf.get("shortName") or snap["symbol"]
-        rev_raw = snap.get("revenue")
-        st.subheader(f"{snap['symbol']} — {name}")
-        m1, m2, m3 = st.columns(3)
-        spot = snap["price"]
-        m1.metric("Spot (last close)", f"{spot:,.2f}" + (" ฿" if market_flag.startswith("SET") else " $"))
-        cap = inf.get("marketCap")
-        if cap:
-            m2.metric("Market cap", f"{cap/1e9:,.2f}B" + (" THB" if market_flag.startswith("SET") else " USD"))
-        else:
-            m2.metric("Market cap", "N/A")
-        rev_disp = manual_rev if manual_rev > 0 else (rev_raw if rev_raw else None)
-        if rev_disp:
-            m3.metric("Revenue (annual, proxy)", f"{rev_disp/1e9:,.2f}B")
-        else:
-            m3.metric("Revenue", "Enter override →")
-
-        scp_usd = NGFS_SCP_USD[scenario_calc]
-        res_single = climate_adjusted_price(
-            spot=spot,
-            intensity_t_per_mrev=intensity_t,
-            scp_usd_per_tonne=scp_usd,
-            pass_through=pass_through,
-            operating_leverage=op_lev,
-            flood_exposure_pct=float(flood_u),
-            physical_sensitivity=phys_sens,
-            fx_local_per_usd=fx_use,
-        )
-
-        st.divider()
-        st.subheader("Single-scenario repricing")
-        r1, r2, r3, r4 = st.columns(4)
-        r1.metric("Shadow SCP (USD/t)", f"{scp_usd:,.0f}")
-        r2.metric("SCP in local / t", f"{res_single['scp_local_per_tonne']:,.0f}")
-        r3.metric("Margin shock (rev)", f"{res_single['margin_shock']*100:.2f}%")
-        r4.metric("Climate-adjusted price", f"{res_single['adjusted_price']:,.2f}")
-
-        ex1, ex2, ex3 = st.columns(3)
-        ex1.metric("Transition equity haircut", f"{res_single['transition_hit']*100:.2f}%")
-        ex2.metric("Physical equity haircut", f"{res_single['physical_hit']*100:.2f}%")
-        ex3.metric("Combined factor", f"{res_single['combined_factor']:.4f}")
-
-        t_h, p_h = res_single["transition_hit"], res_single["physical_hit"]
-        p1 = spot * (1.0 - t_h)
-        fig_w = go.Figure(
-            go.Waterfall(
-                orientation="v",
-                x=["Spot", "− Transition", "− Physical", "Adjusted"],
-                y=[
-                    spot,
-                    -spot * t_h,
-                    -p1 * p_h,
-                    max(res_single["adjusted_price"], 0.0),
-                ],
-                measure=["absolute", "relative", "relative", "total"],
-                textposition="outside",
-                increasing={"marker": {"color": "#2ea043"}},
-                decreasing={"marker": {"color": "#da3633"}},
-                totals={"marker": {"color": "#1f6feb"}},
+            fx_thb_usd = st.number_input(
+                "THB per 1 USD (FX)",
+                min_value=1.0,
+                max_value=80.0,
+                value=36.5,
+                step=0.1,
+                help="Converts SCP (USD/t) to THB/t for SET names. For US stocks, set to 1 and read SCP as USD labels only.",
             )
-        )
-        fig_w.update_layout(
-            height=360,
-            template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="white"),
-            showlegend=False,
-        )
-        st.plotly_chart(fig_w, use_container_width=True, key="calc_waterfall")
+            market_flag = st.radio(
+                "Quote currency",
+                ["SET (THB — typical .BK)", "US / USD listing"],
+                horizontal=True,
+            )
+            fx_use = float(fx_thb_usd) if market_flag.startswith("SET") else 1.0
 
-        st.subheader("Scenario comparison (same company & sliders)")
-        rows = []
-        for scen_name, scp_u in NGFS_SCP_USD.items():
-            r = climate_adjusted_price(
+            sector_pick = st.selectbox("Sector intensity preset (tCO₂e / M revenue)", list(SECTOR_INTENSITY_T_PER_M.keys()))
+            intensity_override = st.checkbox("Manual intensity override")
+            if intensity_override:
+                intensity_t = st.slider(
+                    "Intensity (tonnes CO₂e per M **local** revenue)",
+                    10.0,
+                    2000.0,
+                    float(SECTOR_INTENSITY_T_PER_M[sector_pick]),
+                )
+            else:
+                intensity_t = SECTOR_INTENSITY_T_PER_M[sector_pick]
+
+            pass_through = st.slider("Carbon cost pass-through τ (imperfect pass-through)", 0.0, 1.0, 0.55, 0.05)
+            op_lev = st.slider("Operating leverage Ω (margin shock → equity)", 0.8, 3.0, 1.35, 0.05)
+
+            st.divider()
+            flood_u = st.slider("Physical exposure index (flood / hazard, 0–100)", 0, 100, 35)
+            phys_sens = st.slider("Physical damage sensitivity (equity channel)", 0.0, 1.2, 0.35, 0.05)
+
+        st.title("🧮 Climate-adjusted equity price (proposal channels)")
+        st.caption(
+            "Maps **transition** (shadow carbon price × intensity × pass-through → margin shock → equity) and "
+            "**physical** (flood exposure → damage proxy) into an illustrative **repricing factor**. "
+            "Switch workspace above to **SET intelligence** for charts, OLS carbon sensitivity, and TCFD-style panel."
+        )
+
+        snap = fetch_ticker_snapshot(calc_ticker) if calc_ticker.strip() else None
+
+        colA, colB = st.columns([1, 1])
+        with colA:
+            manual_rev = st.number_input(
+                "Annual revenue override (local currency, 0 = use Yahoo if available)",
+                min_value=0.0,
+                value=0.0,
+                step=1e9,
+                format="%.0f",
+            )
+
+        if snap:
+            inf = snap["info"]
+            name = inf.get("longName") or inf.get("shortName") or snap["symbol"]
+            rev_raw = snap.get("revenue")
+            st.subheader(f"{snap['symbol']} — {name}")
+            m1, m2, m3 = st.columns(3)
+            spot = snap["price"]
+            m1.metric("Spot (last close)", f"{spot:,.2f}" + (" ฿" if market_flag.startswith("SET") else " $"))
+            cap = inf.get("marketCap")
+            if cap:
+                m2.metric("Market cap", f"{cap/1e9:,.2f}B" + (" THB" if market_flag.startswith("SET") else " USD"))
+            else:
+                m2.metric("Market cap", "N/A")
+            rev_disp = manual_rev if manual_rev > 0 else (rev_raw if rev_raw else None)
+            if rev_disp:
+                m3.metric("Revenue (annual, proxy)", f"{rev_disp/1e9:,.2f}B")
+            else:
+                m3.metric("Revenue", "Enter override →")
+
+            scp_usd = NGFS_SCP_USD[scenario_calc]
+            res_single = climate_adjusted_price(
                 spot=spot,
                 intensity_t_per_mrev=intensity_t,
-                scp_usd_per_tonne=scp_u,
+                scp_usd_per_tonne=scp_usd,
                 pass_through=pass_through,
                 operating_leverage=op_lev,
                 flood_exposure_pct=float(flood_u),
                 physical_sensitivity=phys_sens,
                 fx_local_per_usd=fx_use,
             )
-            rows.append(
-                {
-                    "Scenario": scen_name,
-                    "SCP USD/t": scp_u,
-                    "Margin shock %": r["margin_shock"] * 100,
-                    "Adj. price": r["adjusted_price"],
-                    "Δ vs spot %": (r["adjusted_price"] / spot - 1) * 100,
-                }
-            )
-        st.dataframe(pd.DataFrame(rows), use_container_width=True)
 
-        hist = yf.Ticker(snap["symbol"]).history(period="2y")
-        if not hist.empty and len(hist) > 60:
-            rets = hist["Close"].pct_change()
-            cvar = historical_cvar_pct(rets, 0.05)
-            if not np.isnan(cvar):
-                st.caption(
-                    f"Historical 5% CVaR (1-day returns, past ~2y): **{cvar:.2f}%** — tail benchmark only; "
-                    "not the thesis Climate VaR unless you align horizon & shocks."
+            st.divider()
+            st.subheader("Single-scenario repricing")
+            r1, r2, r3, r4 = st.columns(4)
+            r1.metric("Shadow SCP (USD/t)", f"{scp_usd:,.0f}")
+            r2.metric("SCP in local / t", f"{res_single['scp_local_per_tonne']:,.0f}")
+            r3.metric("Margin shock (rev)", f"{res_single['margin_shock']*100:.2f}%")
+            r4.metric("Climate-adjusted price", f"{res_single['adjusted_price']:,.2f}")
+
+            ex1, ex2, ex3 = st.columns(3)
+            ex1.metric("Transition equity haircut", f"{res_single['transition_hit']*100:.2f}%")
+            ex2.metric("Physical equity haircut", f"{res_single['physical_hit']*100:.2f}%")
+            ex3.metric("Combined factor", f"{res_single['combined_factor']:.4f}")
+
+            t_h, p_h = res_single["transition_hit"], res_single["physical_hit"]
+            p1 = spot * (1.0 - t_h)
+            fig_w = go.Figure(
+                go.Waterfall(
+                    orientation="v",
+                    x=["Spot", "− Transition", "− Physical", "Adjusted"],
+                    y=[
+                        spot,
+                        -spot * t_h,
+                        -p1 * p_h,
+                        max(res_single["adjusted_price"], 0.0),
+                    ],
+                    measure=["absolute", "relative", "relative", "total"],
+                    textposition="outside",
+                    increasing={"marker": {"color": "#2ea043"}},
+                    decreasing={"marker": {"color": "#da3633"}},
+                    totals={"marker": {"color": "#1f6feb"}},
+                )
+            )
+            fig_w.update_layout(
+                height=360,
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="white"),
+                showlegend=False,
+            )
+            st.plotly_chart(fig_w, use_container_width=True, key="calc_waterfall")
+
+            st.subheader("Scenario comparison (same company & sliders)")
+            rows = []
+            for scen_name, scp_u in NGFS_SCP_USD.items():
+                r = climate_adjusted_price(
+                    spot=spot,
+                    intensity_t_per_mrev=intensity_t,
+                    scp_usd_per_tonne=scp_u,
+                    pass_through=pass_through,
+                    operating_leverage=op_lev,
+                    flood_exposure_pct=float(flood_u),
+                    physical_sensitivity=phys_sens,
+                    fx_local_per_usd=fx_use,
+                )
+                rows.append(
+                    {
+                        "Scenario": scen_name,
+                        "SCP USD/t": scp_u,
+                        "Margin shock %": r["margin_shock"] * 100,
+                        "Adj. price": r["adjusted_price"],
+                        "Δ vs spot %": (r["adjusted_price"] / spot - 1) * 100,
+                    }
+                )
+            st.dataframe(pd.DataFrame(rows), use_container_width=True)
+
+            hist = yf.Ticker(snap["symbol"]).history(period="2y")
+            if not hist.empty and len(hist) > 60:
+                rets = hist["Close"].pct_change()
+                cvar = historical_cvar_pct(rets, 0.05)
+                if not np.isnan(cvar):
+                    st.caption(
+                        f"Historical 5% CVaR (1-day returns, past ~2y): **{cvar:.2f}%** — tail benchmark only; "
+                        "not the thesis Climate VaR unless you align horizon & shocks."
+                    )
+
+            with st.expander("Formulas used (matches proposal narrative)", expanded=False):
+                st.latex(r"\delta_{\mathrm{margin}} \approx \frac{\mathrm{Intensity}_{t/\mathrm{Mrev}} \cdot \mathrm{SCP}_{\mathrm{local}} \cdot \tau}{10^6}")
+                st.latex(r"\mathrm{Hit}_{\mathrm{trans}} = \min(\Omega \cdot \delta_{\mathrm{margin}},\,\mathrm{cap})")
+                st.latex(r"P_{\mathrm{adj}} \approx P_0 \cdot (1 - \mathrm{Hit}_{\mathrm{trans}}) \cdot (1 - \mathrm{Hit}_{\mathrm{phys}})")
+                st.markdown(
+                    "**Physical:** Hit_phys = min(s · (flood/100)^1.15, cap). Tune **s** with the damage-sensitivity slider."
                 )
 
-        with st.expander("Formulas used (matches proposal narrative)", expanded=False):
-            st.latex(r"\delta_{\mathrm{margin}} \approx \frac{\mathrm{Intensity}_{t/\mathrm{Mrev}} \cdot \mathrm{SCP}_{\mathrm{local}} \cdot \tau}{10^6}")
-            st.latex(r"\mathrm{Hit}_{\mathrm{trans}} = \min(\Omega \cdot \delta_{\mathrm{margin}},\,\mathrm{cap})")
-            st.latex(r"P_{\mathrm{adj}} \approx P_0 \cdot (1 - \mathrm{Hit}_{\mathrm{trans}}) \cdot (1 - \mathrm{Hit}_{\mathrm{phys}})")
-            st.markdown(
-                "**Physical:** Hit_phys = min(s · (flood/100)^1.15, cap). Tune **s** with the damage-sensitivity slider."
+            st.info(
+                "**H1 check:** Compare **Delayed Transition** vs **Net Zero** rows — higher SCP should imply "
+                "lower adjusted price for carbon-intensive intensity (all else equal)."
             )
+        else:
+            st.warning("Enter a valid ticker (e.g. PTT.BK, AAPL) to load prices.")
 
-        st.info(
-            "**H1 check:** Compare **Delayed Transition** vs **Net Zero** rows — higher SCP should imply "
-            "lower adjusted price for carbon-intensive intensity (all else equal)."
+        st.divider()
+        st.caption(
+            "Illustrative teaching model — not BOT ICAAP, not NGFS official calibration. Replace SCP table & intensity with your thesis data."
         )
-    else:
-        st.warning("Enter a valid ticker (e.g. PTT.BK, AAPL) to load prices.")
 
-    st.divider()
-    st.caption(
-        "Illustrative teaching model — not BOT ICAAP, not NGFS official calibration. Replace SCP table & intensity with your thesis data."
-    )
+    else:
+        # --- SET intelligence & TCFD (original Thai Climate Risk main + sidebar) ---
+        with st.sidebar:
+            top_stocks = get_real_top_picks_5()
+            stocks_html = "".join([f'<div class="top-pick-item"><span>{s["symbol"]}</span><span style="color:#8b949e; font-size:0.7rem;">Active Vol.</span></div>' for s in top_stocks])
+            st.markdown(f'<div class="top-pick-container"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p>{stocks_html}</div>', unsafe_allow_html=True)
+
+            with st.expander("🔍 Stock Selection", expanded=True):
+                t1 = st.text_input("Stock 1", "PTT.BK", key="th_t1")
+                t2 = st.text_input("Stock 2", "GULF.BK", key="th_t2")
+                t3 = st.text_input("Stock 3", "", key="th_t3")
+
+            st.divider()
+            with st.expander("🌍 Scenario Policy (TCFD)", expanded=True):
+                scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
+                tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
+                tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
+
+            st.divider()
+            with st.expander("⚙️ Physical Risk Parameters", expanded=True):
+                flood_risk = st.slider("Flood Exposure (%)", 0, 100, 35, key="th_flood")
+                wacc = st.slider("WACC (%)", 5.0, 20.0, 12.0, key="th_wacc") / 100
+
+            tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
+
+        st.title("🏛️ THAI CLIMATE RISK AND FINANCIAL DEEP DIVE")
+        st.caption(
+            "Aligned with IS proposal: scenario pathways echo **NGFS-style** narratives; carbon sensitivity is an **empirical market proxy**, "
+            "not PD/LGD from loan tapes. Use **Climate-adjusted price** in the workspace toggle for proposal-style repricing."
+        )
+        if not tickers:
+            st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้น")
+        else:
+            analysis = fetch_pro_data(tickers, market_mode="TH")
+            if analysis:
+                tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
+                for i, (symbol, d) in enumerate(analysis.items()):
+                    with tabs[i]:
+                        st.markdown(f"### 🇹🇭 {symbol} - Stock Exchange of Thailand")
+                        st.markdown(f'<p class="market-header-sub">SET - Thailand Real Time Price • THB</p>', unsafe_allow_html=True)
+
+                        m1, m2, m3, m4 = st.columns(4)
+                        curr_p = d['price']
+                        prev_p = d['history'].iloc[-2]
+                        p_change = ((curr_p - prev_p) / prev_p) * 100
+                        m1.metric("Current Price", f"฿{curr_p:,.2f}", f"{p_change:+.2f}%")
+                        m2.metric("Carbon sensitivity (OLS β)", f"{d['c_beta']:.4f}", help="Regression on PTTEP−EA vs SET proxy; not NGFS PD shock.")
+                        m3.metric("Market Cap", f"{d.get('info', {}).get('marketCap', 0)/1e9:.2f}B")
+                        m4.metric("Status", "STABLE" if abs(p_change) < 2 else "VOLATILE")
+
+                        st.subheader(f"📈 Price Performance: {symbol}")
+                        st.line_chart(d['history'].iloc[-252:], color="#00ff88")
+
+                        st.divider()
+                        st.subheader(f"📊 Deep Dive: {symbol} Financials & Performance")
+                        ret_1m = ((curr_p / d['history'].iloc[-21]) - 1) * 100
+                        ret_6m = ((curr_p / d['history'].iloc[-126]) - 1) * 100
+                        ret_1y = ((curr_p / d['history'].iloc[-252]) - 1) * 100
+
+                        p_col1, p_col2 = st.columns([1, 2])
+                        with p_col1:
+                            st.markdown("**Performance Tracker**")
+                            st.table(pd.DataFrame({"Period": ["1 Month", "6 Months", "1 Year"], "Return": [f"{ret_1m:+.2f}%", f"{ret_6m:+.2f}%", f"{ret_1y:+.2f}%"]}))
+                        with p_col2:
+                            inf = d.get('info', {})
+                            st.markdown("**Fundamental Highlights**")
+                            f_col1, f_col2 = st.columns(2)
+                            with f_col1:
+                                st.write(f"🏢 **Full Name:** {inf.get('longName', symbol)}")
+                                st.write(f"💰 **Dividend Yield:** {inf.get('dividendYield', 0)*100:.2f}%" if inf.get('dividendYield') else "💰 **Dividend:** N/A")
+                                st.write(f"📈 **52W High:** ฿{inf.get('fiftyTwoWeekHigh', 0):,.2f}")
+                            with f_col2:
+                                st.write(f"🌎 **Sector:** {inf.get('sector', 'N/A')}")
+                                st.write(f"🏦 **Industry:** {inf.get('industry', 'N/A')}")
+                                st.write(f"📉 **52W Low:** ฿{inf.get('fiftyTwoWeekLow', 0):,.2f}")
+
+                        st.markdown('<div class="academic-box">', unsafe_allow_html=True)
+                        st.markdown('<p class="academic-label">🔍 Terminal Trade Recommendation (THAI MARKET)</p>', unsafe_allow_html=True)
+                        if p_change > 0 and d['c_beta'] < 0.2:
+                            st.success(f"🌟 **Signal: BUY / ACCUMULATE** - {symbol} มีแนวโน้มราคาเป็นบวกและมีความเปราะบางต่อความเสี่ยงคาร์บอนต่ำ")
+                        elif p_change < -1 or d['c_beta'] > 0.4:
+                            st.error(f"⚠️ **Signal: REDUCE / SELL** - ราคามีแรงกดดันขาลงและมีความอ่อนไหวต่อปัจจัยภูมิอากาศสูง")
+                        else:
+                            st.warning(f"🔄 **Signal: HOLD / NEUTRAL** - ราคาวิ่งในกรอบแคบ แนะนำให้รอดูความชัดเจน")
+                        st.markdown('</div>', unsafe_allow_html=True)
+
+                        st.divider()
+                        st.subheader(f"📊 Market Intelligence: {symbol}")
+                        def get_val(key, style="{:,.2f}"):
+                            v = inf.get(key)
+                            if v is None or v == 0: return "N/A"
+                            try: return style.format(float(v))
+                            except: return str(v)
+                        m_c1, m_c2, m_c3 = st.columns(3); m_c4, m_c5, m_c6 = st.columns(3)
+                        with m_c1: st.markdown(f'<div class="market-card"><div class="market-label">Market Cap</div><div class="market-value">{get_val("marketCap", "{:,.0f}")}</div></div>', unsafe_allow_html=True)
+                        with m_c2: st.markdown(f'<div class="market-card"><div class="market-label">Trailing P/E</div><div class="market-value">{get_val("trailingPE")}</div></div>', unsafe_allow_html=True)
+                        with m_c3: st.markdown(f'<div class="market-card"><div class="market-label">Beta (5Y)</div><div class="market-value">{get_val("beta")}</div></div>', unsafe_allow_html=True)
+                        with m_c4: st.markdown(f'<div class="market-card"><div class="market-label">Profit Margin</div><div class="market-value">{get_val("profitMargins", "{:.2%}")}</div></div>', unsafe_allow_html=True)
+                        with m_c5: st.markdown(f'<div class="market-card"><div class="market-label">Div. Yield</div><div class="market-value">{get_val("dividendYield", "{:.2%}")}</div></div>', unsafe_allow_html=True)
+                        with m_c6: st.markdown(f'<div class="market-card"><div class="market-label">Debt/Equity</div><div class="market-value">{get_val("debtToEquity")}</div></div>', unsafe_allow_html=True)
+
+                        st.divider()
+                        st.subheader("🛡️ Comprehensive Climate Risk Matrix")
+                        de_raw = inf.get('debtToEquity'); de_ratio = float(de_raw) if de_raw and de_raw != 'N/A' else 100.0
+                        dynamic_trans = d['c_beta'] * 100 * tax_multiplier
+                        credit_risk = "High" if (de_ratio > 150 or abs(dynamic_trans) > 25) else "Low"
+                        op_risk = "High" if flood_risk > 60 else "Low"
+                        r1, r2, r3, r4 = st.columns(4)
+                        r1.warning(f"💳 Credit: {credit_risk}"); r2.error(f"🏗️ Operational: {op_risk}"); r3.info(f"💧 Liquidity: Low"); r4.success(f"⚖️ Liability: Low")
+
+                        st.markdown('<div class="academic-box">', unsafe_allow_html=True)
+                        st.markdown('<p class="academic-label">🔬 Scenario-adjusted risk view (illustrative — not BCBS Climate VaR)</p>', unsafe_allow_html=True)
+                        q1, q2, q3 = st.columns(3); climate_var = abs(dynamic_trans) * 0.1
+                        with q1: st.write(f"📊 **Carbon sensitivity:** **{d['c_beta']:.4f}**")
+                        with q2: st.write(f"📉 **Illustrative tail scale (%):** <span style='color:#ff4b4b;'>**{climate_var:,.2f}%**</span>", unsafe_allow_html=True)
+                        with q3: st.write(f"🏢 **Sector vulnerability (proxy):** {'High' if abs(d['c_beta']) > 0.3 else 'Standard'}")
+                        st.caption("Full thesis Climate VaR/CVaR uses scenario-aggregated EL and repricing models (proposal §3.3).")
+                        st.markdown('</div>', unsafe_allow_html=True)
+
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = dynamic_trans, title={'text': "Transition Sensitivity"}, gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "white"}, 'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
+                            fig_gauge.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=50, b=0))
+                            st.plotly_chart(fig_gauge, use_container_width=True, key=f"th_gauge_{symbol}")
+                        with c2:
+                            raw_cap = inf.get('marketCap', 1e9); mkt_cap_mb = float(raw_cap)/1e6
+                            val_impact = (tax_price * 1000) / wacc / 1e6; adj_val = mkt_cap_mb - val_impact
+                            fig_water = go.Figure(go.Waterfall(orientation = "v", x = ["Initial", "Climate Loss", "Adjusted"], y = [mkt_cap_mb, -val_impact, adj_val], textposition = "outside", increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
+                            fig_water.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=20, b=0))
+                            st.caption("Illustrative market-cap adjustment from stylized carbon price & WACC—not DCF loan-level PD from the proposal.")
+                            st.plotly_chart(fig_water, use_container_width=True, key=f"th_water_{symbol}")
+
+                        if d['news']:
+                            st.subheader(f"📰 Intelligence Feed: {symbol}")
+                            for n in d['news']:
+                                st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}"); st.caption(f"🔗 [Link]({n.get('link')})")
 
 # ==========================================
 # MODULE 0: RESEARCH FRAMEWORK — aligns website with IS proposal PDF
@@ -458,7 +616,7 @@ elif terminal_mode == "📘 Research Framework (IS Proposal)":
             """
 | Proposal concept | In this app (now) |
 |------------------|-------------------|
-| NGFS transition pathway | **Climate Price Impact Calculator** + Thai module scenario names |
+| NGFS transition pathway | **Thai Climate Risk & Price Impact** workspace → repricing + SET scenarios |
 | Shadow carbon price → **equity repricing** | SCP (USD/t) table → **margin shock** → **equity haircut** (Ω) |
 | Physical hazard → loss | Flood index → **convex damage proxy** on equity |
 | Scenario comparison (H1) | Side‑by‑side **Net Zero / Delayed / Current** adjusted prices |
@@ -499,158 +657,6 @@ Past prices and simple rules do not predict future losses. Any “signals” or 
 
     st.divider()
     st.caption("Future work (proposal §4.2): Explainable AI for PD transparency; second-round supply chain and contagion effects.")
-
-# ==========================================
-# MODULE 1: THAI CLIMATE RISK (ห้ามลบ/ย่อของเดิม)
-# ==========================================
-elif terminal_mode == "🏛️ Thai Climate Risk":
-    @st.cache_data(ttl=3600)
-    def get_real_top_picks_5():
-        candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
-        picks = []
-        try:
-            data = yf.download(candidate_tickers, period="5d", progress=False)['Volume']
-            for t in candidate_tickers:
-                if t in data.columns:
-                    v = data[t].dropna()
-                    if not v.empty: picks.append({"symbol": t, "volume": v.iloc[-1]})
-        except: pass
-        return sorted(picks, key=lambda x: x['volume'], reverse=True)[:5]
-
-    with st.sidebar:
-        top_stocks = get_real_top_picks_5()
-        stocks_html = "".join([f'<div class="top-pick-item"><span>{s["symbol"]}</span><span style="color:#8b949e; font-size:0.7rem;">Active Vol.</span></div>' for s in top_stocks])
-        st.markdown(f'<div class="top-pick-container"><p class="top-pick-title">🌟 หุ้นเด่นวันนี้ (Real-time)</p>{stocks_html}</div>', unsafe_allow_html=True)
-
-        with st.expander("🔍 Stock Selection", expanded=True):
-            t1 = st.text_input("Stock 1", "PTT.BK")
-            t2 = st.text_input("Stock 2", "GULF.BK")
-            t3 = st.text_input("Stock 3", "")
-        
-        st.divider()
-        with st.expander("🌍 Scenario Policy (TCFD)", expanded=True):
-            scenario = st.select_slider("Ambition Level", options=["Net Zero 2050", "Delayed Transition", "Current Policy"])
-            tax_multiplier = {"Net Zero 2050": 1.5, "Delayed Transition": 1.0, "Current Policy": 0.5}[scenario]
-            tax_price = {"Net Zero 2050": 1500, "Delayed Transition": 800, "Current Policy": 200}[scenario]
-        
-        st.divider()
-        with st.expander("⚙️ Physical Risk Parameters", expanded=True):
-            flood_risk = st.slider("Flood Exposure (%)", 0, 100, 35)
-            wacc = st.slider("WACC (%)", 5.0, 20.0, 12.0) / 100
-
-        tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
-
-    st.title("🏛️ THAI CLIMATE RISK AND FINANCIAL DEEP DIVE")
-    st.caption(
-        "Aligned with IS proposal: scenario pathways echo **NGFS-style** narratives; carbon sensitivity is an **empirical market proxy**, "
-        "not PD/LGD from loan tapes. See **Research Framework (IS Proposal)** for full methodology."
-    )
-    if not tickers:
-        st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้น")
-    else:
-        analysis = fetch_pro_data(tickers, market_mode="TH")
-        if analysis:
-            tabs = st.tabs([f"Intelligence Center: {s}" for s in analysis.keys()])
-            for i, (symbol, d) in enumerate(analysis.items()):
-                with tabs[i]:
-                    st.markdown(f"### 🇹🇭 {symbol} - Stock Exchange of Thailand")
-                    st.markdown(f'<p class="market-header-sub">SET - Thailand Real Time Price • THB</p>', unsafe_allow_html=True)
-
-                    m1, m2, m3, m4 = st.columns(4)
-                    curr_p = d['price']
-                    prev_p = d['history'].iloc[-2]
-                    p_change = ((curr_p - prev_p) / prev_p) * 100
-                    m1.metric("Current Price", f"฿{curr_p:,.2f}", f"{p_change:+.2f}%")
-                    m2.metric("Carbon sensitivity (OLS β)", f"{d['c_beta']:.4f}", help="Regression on PTTEP−EA vs SET proxy; not NGFS PD shock.")
-                    m3.metric("Market Cap", f"{d.get('info', {}).get('marketCap', 0)/1e9:.2f}B")
-                    m4.metric("Status", "STABLE" if abs(p_change) < 2 else "VOLATILE")
-
-                    st.subheader(f"📈 Price Performance: {symbol}")
-                    st.line_chart(d['history'].iloc[-252:], color="#00ff88")
-
-                    st.divider()
-                    st.subheader(f"📊 Deep Dive: {symbol} Financials & Performance")
-                    ret_1m = ((curr_p / d['history'].iloc[-21]) - 1) * 100
-                    ret_6m = ((curr_p / d['history'].iloc[-126]) - 1) * 100
-                    ret_1y = ((curr_p / d['history'].iloc[-252]) - 1) * 100
-                    
-                    p_col1, p_col2 = st.columns([1, 2])
-                    with p_col1:
-                        st.markdown("**Performance Tracker**")
-                        st.table(pd.DataFrame({"Period": ["1 Month", "6 Months", "1 Year"], "Return": [f"{ret_1m:+.2f}%", f"{ret_6m:+.2f}%", f"{ret_1y:+.2f}%"]}))
-                    with p_col2:
-                        inf = d.get('info', {})
-                        st.markdown("**Fundamental Highlights**")
-                        f_col1, f_col2 = st.columns(2)
-                        with f_col1:
-                            st.write(f"🏢 **Full Name:** {inf.get('longName', symbol)}")
-                            st.write(f"💰 **Dividend Yield:** {inf.get('dividendYield', 0)*100:.2f}%" if inf.get('dividendYield') else "💰 **Dividend:** N/A")
-                            st.write(f"📈 **52W High:** ฿{inf.get('fiftyTwoWeekHigh', 0):,.2f}")
-                        with f_col2:
-                            st.write(f"🌎 **Sector:** {inf.get('sector', 'N/A')}")
-                            st.write(f"🏦 **Industry:** {inf.get('industry', 'N/A')}")
-                            st.write(f"📉 **52W Low:** ฿{inf.get('fiftyTwoWeekLow', 0):,.2f}")
-
-                    st.markdown('<div class="academic-box">', unsafe_allow_html=True)
-                    st.markdown('<p class="academic-label">🔍 Terminal Trade Recommendation (THAI MARKET)</p>', unsafe_allow_html=True)
-                    if p_change > 0 and d['c_beta'] < 0.2:
-                        st.success(f"🌟 **Signal: BUY / ACCUMULATE** - {symbol} มีแนวโน้มราคาเป็นบวกและมีความเปราะบางต่อความเสี่ยงคาร์บอนต่ำ")
-                    elif p_change < -1 or d['c_beta'] > 0.4:
-                        st.error(f"⚠️ **Signal: REDUCE / SELL** - ราคามีแรงกดดันขาลงและมีความอ่อนไหวต่อปัจจัยภูมิอากาศสูง")
-                    else:
-                        st.warning(f"🔄 **Signal: HOLD / NEUTRAL** - ราคาวิ่งในกรอบแคบ แนะนำให้รอดูความชัดเจน")
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-                    st.divider()
-                    st.subheader(f"📊 Market Intelligence: {symbol}")
-                    def get_val(key, style="{:,.2f}"):
-                        v = inf.get(key)
-                        if v is None or v == 0: return "N/A"
-                        try: return style.format(float(v))
-                        except: return str(v)
-                    m_c1, m_c2, m_c3 = st.columns(3); m_c4, m_c5, m_c6 = st.columns(3)
-                    with m_c1: st.markdown(f'<div class="market-card"><div class="market-label">Market Cap</div><div class="market-value">{get_val("marketCap", "{:,.0f}")}</div></div>', unsafe_allow_html=True)
-                    with m_c2: st.markdown(f'<div class="market-card"><div class="market-label">Trailing P/E</div><div class="market-value">{get_val("trailingPE")}</div></div>', unsafe_allow_html=True)
-                    with m_c3: st.markdown(f'<div class="market-card"><div class="market-label">Beta (5Y)</div><div class="market-value">{get_val("beta")}</div></div>', unsafe_allow_html=True)
-                    with m_c4: st.markdown(f'<div class="market-card"><div class="market-label">Profit Margin</div><div class="market-value">{get_val("profitMargins", "{:.2%}")}</div></div>', unsafe_allow_html=True)
-                    with m_c5: st.markdown(f'<div class="market-card"><div class="market-label">Div. Yield</div><div class="market-value">{get_val("dividendYield", "{:.2%}")}</div></div>', unsafe_allow_html=True)
-                    with m_c6: st.markdown(f'<div class="market-card"><div class="market-label">Debt/Equity</div><div class="market-value">{get_val("debtToEquity")}</div></div>', unsafe_allow_html=True)
-
-                    st.divider()
-                    st.subheader("🛡️ Comprehensive Climate Risk Matrix")
-                    de_raw = inf.get('debtToEquity'); de_ratio = float(de_raw) if de_raw and de_raw != 'N/A' else 100.0
-                    dynamic_trans = d['c_beta'] * 100 * tax_multiplier
-                    credit_risk = "High" if (de_ratio > 150 or abs(dynamic_trans) > 25) else "Low"
-                    op_risk = "High" if flood_risk > 60 else "Low"
-                    r1, r2, r3, r4 = st.columns(4)
-                    r1.warning(f"💳 Credit: {credit_risk}"); r2.error(f"🏗️ Operational: {op_risk}"); r3.info(f"💧 Liquidity: Low"); r4.success(f"⚖️ Liability: Low")
-
-                    st.markdown('<div class="academic-box">', unsafe_allow_html=True)
-                    st.markdown('<p class="academic-label">🔬 Scenario-adjusted risk view (illustrative — not BCBS Climate VaR)</p>', unsafe_allow_html=True)
-                    q1, q2, q3 = st.columns(3); climate_var = abs(dynamic_trans) * 0.1
-                    with q1: st.write(f"📊 **Carbon sensitivity:** **{d['c_beta']:.4f}**")
-                    with q2: st.write(f"📉 **Illustrative tail scale (%):** <span style='color:#ff4b4b;'>**{climate_var:,.2f}%**</span>", unsafe_allow_html=True)
-                    with q3: st.write(f"🏢 **Sector vulnerability (proxy):** {'High' if abs(d['c_beta']) > 0.3 else 'Standard'}")
-                    st.caption("Full thesis Climate VaR/CVaR uses scenario-aggregated EL and repricing models (proposal §3.3).")
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        fig_gauge = go.Figure(go.Indicator(mode = "gauge+number", value = dynamic_trans, title={'text': "Transition Sensitivity"}, gauge = {'axis': {'range': [-50, 50]}, 'bar': {'color': "white"}, 'steps': [{'range': [-50, 0], 'color': '#238636'}, {'range': [0, 20], 'color': '#f1e05a'}, {'range': [20, 50], 'color': '#da3633'}]}))
-                        fig_gauge.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=50, b=0))
-                        st.plotly_chart(fig_gauge, use_container_width=True, key=f"th_gauge_{symbol}")
-                    with c2:
-                        raw_cap = inf.get('marketCap', 1e9); mkt_cap_mb = float(raw_cap)/1e6
-                        val_impact = (tax_price * 1000) / wacc / 1e6; adj_val = mkt_cap_mb - val_impact
-                        fig_water = go.Figure(go.Waterfall(orientation = "v", x = ["Initial", "Climate Loss", "Adjusted"], y = [mkt_cap_mb, -val_impact, adj_val], textposition = "outside", increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
-                        fig_water.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=20, b=0))
-                        st.caption("Illustrative market-cap adjustment from stylized carbon price & WACC—not DCF loan-level PD from the proposal.")
-                        st.plotly_chart(fig_water, use_container_width=True, key=f"th_water_{symbol}")
-
-                    if d['news']:
-                        st.subheader(f"📰 Intelligence Feed: {symbol}")
-                        for n in d['news']:
-                            st.markdown(f"**[{n.get('publisher')}]** {n.get('title')}"); st.caption(f"🔗 [Link]({n.get('link')})")
 
 # ==========================================
 # MODULE 2: GLOBAL TECHNICAL ANALYSIS (ห้ามลบ/ย่อของเดิม)
