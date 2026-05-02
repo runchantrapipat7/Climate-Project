@@ -4,11 +4,13 @@ import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 import plotly.graph_objects as go
-from datetime import datetime
-import time
 
 # --- CONFIGURATION ---
-st.set_page_config(page_title="Climate & Global Finance Pro Terminal", layout="wide")
+st.set_page_config(
+    page_title="Climate Risk & Sustainable Finance Terminal",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 # --- CSS: ULTIMATE DARK TERMINAL UI (รักษาไว้ครบถ้วน 100% จากต้นฉบับของคุณ) ---
 st.markdown("""
@@ -105,13 +107,97 @@ def fetch_pro_data(ticker_list, market_mode="TH"):
 # --- SIDEBAR NAVIGATION (เพิ่มรายการใน Module) ---
 with st.sidebar:
     st.title("🛡️ Risk Controller")
-    terminal_mode = st.radio("Select Module", ["🏛️ Thai Climate Risk", "🌎 Global Technical Analysis", "📈 Thai Technical Analysis"])
+    terminal_mode = st.radio(
+        "Select Module",
+        [
+            "🏛️ Thai Climate Risk",
+            "🌎 Global Technical Analysis",
+            "📈 Thai Technical Analysis",
+            "📘 Research Framework (IS Proposal)",
+        ],
+    )
     st.divider()
+
+# ==========================================
+# MODULE 0: RESEARCH FRAMEWORK — aligns website with IS proposal PDF
+# ==========================================
+if terminal_mode == "📘 Research Framework (IS Proposal)":
+    st.title("Climate Risk Modeling and Sustainable Finance")
+    st.caption(
+        "Independent Study Proposal · MSc Financial Engineering · Graduate School of Development Economics (NIDA) · Academic Year 2025"
+    )
+    st.markdown(
+        "**Advisor:** Assoc. Prof. Dr. Saran Sarntisart  ·  **Co-Advisor:** Assoc. Prof. Ronnachai Tiyarattanachai"
+    )
+
+    st.info(
+        "**Purpose of this page:** This terminal’s **Thai Climate Risk** module is a **live demonstration layer** "
+        "built for communication and exploration. The **full thesis model** in your proposal uses NGFS scenarios, "
+        "shadow carbon prices, DCF-based PD shocks, damage functions for LGD, and portfolio-level EL / Climate VaR / CVaR. "
+        "The demo uses **market proxies** (yfinance) and **illustrative** scenario sliders—not the complete prudential engine."
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("Research objectives (proposal)")
+        st.markdown(
+            """
+1. **Integrated framework:** Map **NGFS scenarios** to combined transition + physical shocks for APAC credit/market exposure.
+2. **Prudential metrics:** Produce **EL** and **Climate VaR / CVaR** suitable for screening and stress narratives (BCBS-style framing).
+3. **Strategic allocation:** Inform capital allocation toward **climate-resilient** versus vulnerable exposures.
+"""
+        )
+    with c2:
+        st.subheader("What this website demonstrates today")
+        st.markdown(
+            """
+| Proposal concept | In this app (now) |
+|------------------|-------------------|
+| NGFS transition pathway | Scenario slider: Net Zero / Delayed / Current Policy |
+| Shadow carbon price → stress | Stylized **tax price** + multiplier (illustrative) |
+| Physical hazard → **LGD** | User **flood exposure** slider (qualitative proxy) |
+| Market repricing / Climate VaR | **Carbon sensitivity** (OLS vs PTTEP−EA spread) + **illustrative** % gauge |
+| Technical monitoring | Global / Thai **MA·RSI·MACD** modules (not core thesis math) |
+"""
+        )
+
+    st.subheader("Integrated stress-testing logic (thesis)")
+    st.markdown(
+        """
+- **Transition → PD channel:** DCF shock from **shadow carbon price** and pass-through to cash flows (counterparty level).
+- **Physical → LGD channel:** Catastrophe-style **damage functions** (e.g. flood depth) collateral erosion.
+- **Aggregation:** **EL = PD × LGD × EAD**; market tail risk via **Climate VaR**; systemic angle via **ΔCoVaR** (Thai banking literature context: Jung et al., 2025).
+
+**Next step for a “full” web demo:** ingest **NGFS Phase V** SCP series, **CIE** or internal hazard layers, and a **proxy loan/portfolio** file—then replace illustrative sliders with calibrated shocks.
+"""
+    )
+
+    st.subheader("Hypotheses (summary)")
+    st.markdown(
+        """
+- **H1:** **Delayed Transition** implies higher portfolio **EL** and **Climate VaR** than **Net Zero 2050** (disorderly vs orderly pathway).
+- **H2 (regional):** In the medium term, **physical** drivers may dominate **LGD** channels vs transition-driven **PD**—validated via contribution analysis (proposal §3.4).
+
+This UI does **not** estimate PD/LGD/EAD numerically; it helps **communicate** scenarios and sensitivity until full data pipelines are connected.
+"""
+    )
+
+    with st.expander("Disclaimer", expanded=False):
+        st.markdown(
+            """
+This application is for **education and research demonstration** only. It is **not** investment advice, a regulated stress test, or an ICAAP submission.
+
+Past prices and simple rules do not predict future losses. Any “signals” or scenario numbers are **illustrative** unless backed by your calibrated thesis implementation.
+"""
+        )
+
+    st.divider()
+    st.caption("Future work (proposal §4.2): Explainable AI for PD transparency; second-round supply chain and contagion effects.")
 
 # ==========================================
 # MODULE 1: THAI CLIMATE RISK (ห้ามลบ/ย่อของเดิม)
 # ==========================================
-if terminal_mode == "🏛️ Thai Climate Risk":
+elif terminal_mode == "🏛️ Thai Climate Risk":
     @st.cache_data(ttl=3600)
     def get_real_top_picks_5():
         candidate_tickers = ["PTT.BK", "CPALL.BK", "AOT.BK", "KBANK.BK", "EA.BK", "ADVANC.BK", "GULF.BK", "SCB.BK"]
@@ -149,6 +235,10 @@ if terminal_mode == "🏛️ Thai Climate Risk":
         tickers = [t.strip().upper() for t in [t1, t2, t3] if t.strip()]
 
     st.title("🏛️ THAI CLIMATE RISK AND FINANCIAL DEEP DIVE")
+    st.caption(
+        "Aligned with IS proposal: scenario pathways echo **NGFS-style** narratives; carbon sensitivity is an **empirical market proxy**, "
+        "not PD/LGD from loan tapes. See **Research Framework (IS Proposal)** for full methodology."
+    )
     if not tickers:
         st.info("💡 กรุณาระบุชื่อหุ้นใน Sidebar (เช่น PTT.BK) เพื่อเริ่มต้น")
     else:
@@ -165,7 +255,7 @@ if terminal_mode == "🏛️ Thai Climate Risk":
                     prev_p = d['history'].iloc[-2]
                     p_change = ((curr_p - prev_p) / prev_p) * 100
                     m1.metric("Current Price", f"฿{curr_p:,.2f}", f"{p_change:+.2f}%")
-                    m2.metric("Climate Beta", f"{d['c_beta']:.4f}")
+                    m2.metric("Carbon sensitivity (OLS β)", f"{d['c_beta']:.4f}", help="Regression on PTTEP−EA vs SET proxy; not NGFS PD shock.")
                     m3.metric("Market Cap", f"{d.get('info', {}).get('marketCap', 0)/1e9:.2f}B")
                     m4.metric("Status", "STABLE" if abs(p_change) < 2 else "VOLATILE")
 
@@ -230,11 +320,12 @@ if terminal_mode == "🏛️ Thai Climate Risk":
                     r1.warning(f"💳 Credit: {credit_risk}"); r2.error(f"🏗️ Operational: {op_risk}"); r3.info(f"💧 Liquidity: Low"); r4.success(f"⚖️ Liability: Low")
 
                     st.markdown('<div class="academic-box">', unsafe_allow_html=True)
-                    st.markdown('<p class="academic-label">🔬 Quantitative Climate Risk Analytics (TCFD Framework)</p>', unsafe_allow_html=True)
+                    st.markdown('<p class="academic-label">🔬 Scenario-adjusted risk view (illustrative — not BCBS Climate VaR)</p>', unsafe_allow_html=True)
                     q1, q2, q3 = st.columns(3); climate_var = abs(dynamic_trans) * 0.1
-                    with q1: st.write(f"📊 **Sensitivity:** **{d['c_beta']:.4f}**")
-                    with q2: st.write(f"📉 **Climate VaR:** <span style='color:#ff4b4b;'>**{climate_var:,.2f}%**</span>", unsafe_allow_html=True)
-                    with q3: st.write(f"🏢 **Sector Vulnerability:** {'High' if abs(d['c_beta']) > 0.3 else 'Standard'}")
+                    with q1: st.write(f"📊 **Carbon sensitivity:** **{d['c_beta']:.4f}**")
+                    with q2: st.write(f"📉 **Illustrative tail scale (%):** <span style='color:#ff4b4b;'>**{climate_var:,.2f}%**</span>", unsafe_allow_html=True)
+                    with q3: st.write(f"🏢 **Sector vulnerability (proxy):** {'High' if abs(d['c_beta']) > 0.3 else 'Standard'}")
+                    st.caption("Full thesis Climate VaR/CVaR uses scenario-aggregated EL and repricing models (proposal §3.3).")
                     st.markdown('</div>', unsafe_allow_html=True)
 
                     c1, c2 = st.columns(2)
@@ -247,6 +338,7 @@ if terminal_mode == "🏛️ Thai Climate Risk":
                         val_impact = (tax_price * 1000) / wacc / 1e6; adj_val = mkt_cap_mb - val_impact
                         fig_water = go.Figure(go.Waterfall(orientation = "v", x = ["Initial", "Climate Loss", "Adjusted"], y = [mkt_cap_mb, -val_impact, adj_val], textposition = "outside", increasing = {"marker":{"color":"#2ea043"}}, decreasing = {"marker":{"color":"#da3633"}}, totals = {"marker":{"color":"#1f6feb"}}))
                         fig_water.update_layout(height=280, paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"}, margin=dict(t=20, b=0))
+                        st.caption("Illustrative market-cap adjustment from stylized carbon price & WACC—not DCF loan-level PD from the proposal.")
                         st.plotly_chart(fig_water, use_container_width=True, key=f"th_water_{symbol}")
 
                     if d['news']:
@@ -426,4 +518,8 @@ elif terminal_mode == "📈 Thai Technical Analysis":
                     st.markdown('</div>', unsafe_allow_html=True)
 
 # --- FOOTER ---
-st.markdown(f'<div class="footer">🏛️ Climate & Global Finance Terminal | <b>Presented by Run Chantrapipat</b> | © 2026</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="footer">🏛️ Climate Risk Modeling & Sustainable Finance Terminal · Independent Study demo · '
+    '<b>Run Chantrapipat</b> · © 2026</div>',
+    unsafe_allow_html=True,
+)
