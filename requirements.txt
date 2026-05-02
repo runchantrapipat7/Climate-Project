@@ -4,3 +4,6 @@ pandas
 numpy
 statsmodels
 plotly
+openpyxl
+requests
+scikit-learn
